@@ -131,14 +131,14 @@ export default function EditProfileModal({ open, onClose, profile, token, onSave
         </div>
 
         <div className="qr-upload-section">
-          <label>Payment QR Code <span className="field-optional">(GCash or E-bank)</span></label>
+          <label>Payment QR Code <span className="field-optional">(E-Wallet or Online Banking)</span></label>
           {qrPreview && <img className="qr-current" src={qrPreview} alt="Current QR Code" />}
           <div className="qr-upload-btn" onClick={() => fileInputRef.current?.click()}>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleQRUpload} style={{ display: 'none' }} />
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
             <span>{qrUploading ? 'Uploading…' : 'Upload new QR code image'}</span>
           </div>
-          <p className="qr-note">This QR code will be shown to buyers when they purchase your items. Upload a clear screenshot of your GCash or bank QR code.</p>
+          <p className="qr-note">This QR code will be shown to buyers when they purchase your items. Upload a clear screenshot of your e-wallet (GCash, Maya) or online banking QR code.</p>
         </div>
 
         <button className="btn-modal-submit" disabled={submitting} onClick={handleSubmit}>

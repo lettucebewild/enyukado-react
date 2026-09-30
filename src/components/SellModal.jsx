@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createProduct, updateProduct } from '../api/productsApi.js';
 import AppHeader from './AppHeader.jsx';
 
-const CONDITIONS = ['Like new', 'Good', 'Used', 'Fair', 'Poor'];
+const CONDITIONS = ['Brand new', 'Like new', 'Lightly used', 'Well used', 'Heavily used'];
 
 export default function SellModal({ open, onClose, categories, token, editData, onSaved, onToast, headerProps }) {
   const [form, setForm] = useState(emptyForm());

@@ -335,8 +335,8 @@ export default function Dashboard() {
           ) : (
             products.map((p) => {
               const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
-              const condClass = p.ProductCondition === 'Poor' ? 'poor'
-                : (p.ProductCondition === 'Fair' || p.ProductCondition === 'Used') ? 'fair' : '';
+              const condClass = ['Heavily used', 'Poor'].includes(p.ProductCondition) ? 'poor'
+                : ['Well used', 'Used', 'Fair'].includes(p.ProductCondition) ? 'fair' : '';
               const liked = savedIds.has(p.ProductID);
               return (
                 <div className="listing-card" key={p.ProductID} onClick={() => openProduct(p.ProductID)}>
@@ -466,15 +466,9 @@ export default function Dashboard() {
 // ------------------------------------------------------------------
 // NOTE ON CATEGORIES
 // ------------------------------------------------------------------
-// Category chips are still fetched live from GET /api/categories, so
-// they'll always match whatever's in the Categories table. The requested
-// chip set (School Supplies, Gadgets, Books, Clothing, Food, Arts,
-// Tickets, Others) won't appear until the DB rows are renamed to match.
-// Run this once in SSMS to rename the existing 8 categories in place
-// (keeps the same CategoryIDs, so existing listings keep their category):
-//
-//   UPDATE Categories SET CategoryName = 'Gadgets'  WHERE CategoryName = 'Electronics';
-//   UPDATE Categories SET CategoryName = 'Food'      WHERE CategoryName = 'Food & Drinks';
-//   UPDATE Categories SET CategoryName = 'Arts'      WHERE CategoryName = 'Sports & Recreation';
-//   UPDATE Categories SET CategoryName = 'Tickets'   WHERE CategoryName = 'Services';
-//   -- Books, Clothing, School Supplies, Others already match.
+// Category chips are fetched live from GET /api/categories, so they match
+// whatever is in the Categories collection. The current set is:
+// School Supplies, Gadgets, Books, Clothing, Food, Arts, Tickets, Others.
+// Run `npm run seed` in /backend once — it creates any missing categories
+// and renames the old ones in place (Electronics -> Gadgets, etc.) so
+// existing listings keep their category.

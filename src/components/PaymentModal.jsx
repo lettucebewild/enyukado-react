@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { submitPurchase } from '../api/transactionsApi.js';
 
+const PAYMENT_OPTIONS = {
+  'E-Wallet': { icon: '💙', sub: '(GCash, Maya)' },
+  'Online Banking': { icon: '🏦', sub: '(BDO, BPI, Maribank, Metrobank, UnionBank)' },
+};
+
 export default function PaymentModal({ product, token, onClose, onSuccess, onToast }) {
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState(null);
@@ -55,7 +60,7 @@ export default function PaymentModal({ product, token, onClose, onSuccess, onToa
 
   async function handleSubmit() {
     if (!proofFile) {
-      onToast?.(method === 'GCash' ? 'Please upload proof of payment.' : 'Please upload transfer confirmation.', 'error');
+      onToast?.(method === 'E-Wallet' ? 'Please upload proof of payment.' : 'Please upload transfer confirmation.', 'error');
       return;
     }
     setSubmitting(true);
@@ -107,28 +112,29 @@ export default function PaymentModal({ product, token, onClose, onSuccess, onToa
             <div>
               <p style={{ fontSize: '0.85rem', color: 'var(--charcoal-2)', marginBottom: 14, fontWeight: 300 }}>How would you like to pay?</p>
               <div className="payment-methods">
-                <button className={`payment-method-btn${method === 'GCash' ? ' selected' : ''}`} onClick={() => setMethod('GCash')}>
-                  <div className="pm-icon">💙</div>
-                  <div className="pm-name">GCash</div>
-                  <div className="pm-sub">Mobile wallet</div>
-                </button>
-                <button className={`payment-method-btn${method === 'E-bank' ? ' selected' : ''}`} onClick={() => setMethod('E-bank')}>
-                  <div className="pm-icon">🏦</div>
-                  <div className="pm-name">E-bank</div>
-                  <div className="pm-sub">Online banking</div>
-                </button>
+                {Object.entries(PAYMENT_OPTIONS).map(([name, opt]) => (
+                  <button
+                    key={name}
+                    className={`payment-method-btn${method === name ? ' selected' : ''}`}
+                    onClick={() => setMethod(name)}
+                  >
+                    <div className="pm-icon">{opt.icon}</div>
+                    <div className="pm-name">{name}</div>
+                    <div className="pm-sub">{opt.sub}</div>
+                  </button>
+                ))}
               </div>
               <button className="btn-modal-submit" disabled={!method} style={{ opacity: method ? 1 : 0.5 }} onClick={() => setStep(2)}>
-                {method === 'E-bank' ? 'Next — Enter Card Details →' : 'Next →'}
+                {method === 'Online Banking' ? 'Next — Enter Card Details →' : 'Next →'}
               </button>
             </div>
           )}
 
-          {step === 2 && method === 'GCash' && (
+          {step === 2 && method === 'E-Wallet' && (
             <div>
               <div className="qr-display">
                 <div className="qr-amount">{formatted}</div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--charcoal-3)', marginBottom: 12 }}>Scan the GCash QR code below and pay the exact amount</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--charcoal-3)', marginBottom: 12 }}>Scan the seller's QR code below and pay the exact amount</p>
                 <div style={{ width: '100%', maxWidth: 320, margin: '0 auto 12px', background: '#f4f5f7', borderRadius: 12, border: '2px solid rgba(50,111,202,0.12)', overflow: 'hidden', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {product.qrCode ? (
                     <img src={product.qrCode} alt="Seller QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -143,14 +149,14 @@ export default function PaymentModal({ product, token, onClose, onSuccess, onToa
                 <input type="file" accept="image/*" onChange={handleProofUpload} />
                 <div className="puz-icon">📷</div>
                 <div className="puz-text">Tap to upload screenshot</div>
-                <div className="puz-sub">GCash receipt screenshot</div>
+                <div className="puz-sub">E-wallet receipt screenshot</div>
               </div>
               {proofPreview && <img className="proof-preview" src={proofPreview} alt="Payment proof preview" style={{ display: 'block' }} />}
 
               <div className="confirm-check">
                 <input type="checkbox" id="confirmPaidCheck" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
                 <label htmlFor="confirmPaidCheck">
-                  I confirm that I have paid <strong>{formatted}</strong> to <strong>{product.sellerName || 'the seller'}</strong> via GCash and the screenshot above is my proof.
+                  I confirm that I have paid <strong>{formatted}</strong> to <strong>{product.sellerName || 'the seller'}</strong> via E-Wallet and the screenshot above is my proof.
                 </label>
               </div>
 
@@ -168,7 +174,7 @@ export default function PaymentModal({ product, token, onClose, onSuccess, onToa
             </div>
           )}
 
-          {step === 2 && method === 'E-bank' && (
+          {step === 2 && method === 'Online Banking' && (
             <div>
               <div style={{ background: 'linear-gradient(135deg,#326fca,#4e87d4)', borderRadius: 12, padding: '20px 22px', marginBottom: 18, color: 'white' }}>
                 <div style={{ fontSize: '0.7rem', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 16 }}>ENYUKADO · ONLINE BANKING</div>

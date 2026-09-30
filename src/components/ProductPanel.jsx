@@ -81,8 +81,10 @@ export default function ProductPanel({
     ? (product.SellerFirstName[0] + product.SellerLastName[0]).toUpperCase()
     : (product.sellerName ? product.sellerName[0].toUpperCase() : '?');
   const sellerName = product.sellerName || `${product.SellerFirstName || ''} ${product.SellerLastName || ''}`.trim() || 'Unknown';
-  const condColor = product.ProductCondition === 'Fair' || product.ProductCondition === 'Used' ? 'fair'
-    : product.ProductCondition === 'Poor' ? 'poor' : '';
+  // Brand new / Like new / Lightly used -> green, Well used -> orange, Heavily used -> red
+  // (legacy Used/Fair/Poor values are still colour-coded so old listings look right)
+  const condColor = ['Well used', 'Used', 'Fair'].includes(product.ProductCondition) ? 'fair'
+    : ['Heavily used', 'Poor'].includes(product.ProductCondition) ? 'poor' : '';
   const postedAgo = product.DatePosted ? timeAgo(new Date(product.DatePosted)) : 'Recently';
   const outOfStock = product.Quantity <= 0 || product.Status === 'Sold';
   const inCart = cart?.isInCart(product.ProductID);

@@ -135,7 +135,7 @@ async function main() {
     section('Products');
     form = new FormData();
     form.append('productName', 'Calculus Textbook'); form.append('price', '250');
-    form.append('productCondition', 'Good'); form.append('categoryID', String(categoryID));
+    form.append('productCondition', 'Lightly used'); form.append('categoryID', String(categoryID));
     form.append('description', 'Barely used'); form.append('quantity', '1');
     r = await call('POST', '/api/products/add', { token: seller, form });
     check('Add product without image → 400', r.status === 400);
@@ -161,7 +161,7 @@ async function main() {
     r = await call('GET', '/api/products/999999');
     check('Unknown product → 404', r.status === 404);
     form = new FormData();
-    form.append('productName', 'Bad'); form.append('price', 'abc'); form.append('productCondition', 'Good'); form.append('categoryID', String(categoryID));
+    form.append('productName', 'Bad'); form.append('price', 'abc'); form.append('productCondition', 'Lightly used'); form.append('categoryID', String(categoryID));
     form.append('productImages', png(), 'a.png');
     r = await call('POST', '/api/products/add', { token: seller, form });
     check('Non-numeric price → 400 (not 500)', r.status === 400, JSON.stringify(r.data));
@@ -181,13 +181,13 @@ async function main() {
     check('Check saved → false', r.data.saved === false);
 
     section('Purchase → payment approval → drop-off → pickup');
-    form = new FormData(); form.append('productID', String(productID)); form.append('paymentMethod', 'GCash');
+    form = new FormData(); form.append('productID', String(productID)); form.append('paymentMethod', 'E-Wallet');
     r = await call('POST', '/api/transactions', { token: buyer, form });
     check('Buy without proof → 400', r.status === 400);
-    form = new FormData(); form.append('productID', String(productID)); form.append('paymentMethod', 'GCash'); form.append('paymentProof', png(), 'p.png');
+    form = new FormData(); form.append('productID', String(productID)); form.append('paymentMethod', 'E-Wallet'); form.append('paymentProof', png(), 'p.png');
     r = await call('POST', '/api/transactions', { token: seller, form });
     check('Cannot buy own product → 400', r.status === 400);
-    form = new FormData(); form.append('productID', String(productID)); form.append('paymentMethod', 'GCash'); form.append('paymentProof', png(), 'p.png');
+    form = new FormData(); form.append('productID', String(productID)); form.append('paymentMethod', 'E-Wallet'); form.append('paymentProof', png(), 'p.png');
     r = await call('POST', '/api/transactions', { token: buyer, form });
     check('Buyer purchases → 201', r.status === 201 && !!r.data.transactionId, JSON.stringify(r.data));
     const txID = r.data?.transactionId;
@@ -269,7 +269,7 @@ async function main() {
 
     section('Rejection flows');
     form = new FormData();
-    form.append('productName', 'Reject me'); form.append('price', '10'); form.append('productCondition', 'Fair'); form.append('categoryID', String(categoryID));
+    form.append('productName', 'Reject me'); form.append('price', '10'); form.append('productCondition', 'Well used'); form.append('categoryID', String(categoryID));
     form.append('productImages', png(), 'a.png');
     r = await call('POST', '/api/products/add', { token: seller, form });
     const rejId = r.data?.productId;

@@ -59,7 +59,7 @@ async function loadRelated(transactions, userFields) {
 
 // --- 1. CREATE A TRANSACTION / BUY (Private - Buyer) ---
 // Body: { productID, paymentMethod } + file: paymentProof
-// PaymentMethod: 'GCash' | 'E-bank'
+// PaymentMethod: 'E-Wallet' | 'Online Banking'
 // Creates transaction as 'Pending', sends system messages to both parties
 router.post('/', auth, proofUpload.single('paymentProof'), async (req, res) => {
     const { productID, paymentMethod } = req.body;
@@ -69,9 +69,9 @@ router.post('/', auth, proofUpload.single('paymentProof'), async (req, res) => {
         return res.status(400).json({ message: 'ProductID is required.' });
     }
 
-    const validMethods = ['GCash', 'E-bank'];
+    const validMethods = ['E-Wallet', 'Online Banking'];
     if (!paymentMethod || !validMethods.includes(paymentMethod)) {
-        return res.status(400).json({ message: 'Payment method must be GCash or E-bank.' });
+        return res.status(400).json({ message: 'Payment method must be E-Wallet or Online Banking.' });
     }
 
     if (!req.file) {
