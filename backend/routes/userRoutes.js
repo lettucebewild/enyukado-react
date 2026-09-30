@@ -6,7 +6,8 @@ const auth     = require('../middleware/auth');
 const multer   = require('multer');
 const path     = require('path');
 const fs       = require('fs');
-const { poolPromise, sql } = require('../config/db');
+const { User, nextId, NO_ID } = require('../models');
+const { BASE_URL, toInt, sendError } = require('../utils/helpers');
 
 // ============================================================
 // CONSTANTS
@@ -65,35 +66,35 @@ router.post('/register', async (req, res) => {
     }
 
     try {
-        const pool = await poolPromise;
+        const cleanEmail = email.toLowerCase().trim();
 
-        const emailCheck = await pool.request()
-            .input('email', sql.VarChar, email.toLowerCase())
-            .query('SELECT UserID FROM Users WHERE Email = @email');
-
-        if (emailCheck.recordset.length > 0) {
+        const exists = await User.exists({ Email: cleanEmail });
+        if (exists) {
             return res.status(400).json({ message: 'Email already registered.' });
         }
 
         const salt           = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        await pool.request()
-            .input('firstName', sql.VarChar, firstName)
-            .input('lastName',  sql.VarChar, lastName)
-            .input('email',     sql.VarChar, email.toLowerCase())
-            .input('password',  sql.VarChar, hashedPassword)
-            .query(`
-                INSERT INTO Users (FirstName, LastName, Email, Password, IsAdmin, IsApproved)
-                VALUES (@firstName, @lastName, @email, @password, 0, 0)
-            `);
+        await User.create({
+            UserID:     await nextId('UserID'),
+            FirstName:  firstName,
+            LastName:   lastName,
+            Email:      cleanEmail,
+            Password:   hashedPassword,
+            IsAdmin:    false,
+            IsApproved: false
+        });
 
         res.status(201).json({
             message: 'Registration submitted! Your account is pending admin approval.'
         });
     } catch (err) {
-        console.error('Register Error:', err.message);
-        res.status(500).json({ error: err.message });
+        // Unique index on Email — two simultaneous sign-ups with the same address
+        if (err.code === 11000) {
+            return res.status(400).json({ message: 'Email already registered.' });
+        }
+        sendError(res, 'Register Error', err);
     }
 });
 
@@ -110,12 +111,7 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('email', sql.VarChar, email.toLowerCase())
-            .query('SELECT * FROM Users WHERE Email = @email');
-
-        const user = result.recordset[0];
+        const user = await User.findOne({ Email: email.toLowerCase().trim() }).lean();
         if (!user) return res.status(404).json({ message: 'User not found.' });
 
         if (user.IsAdmin) {
@@ -147,8 +143,7 @@ router.post('/login', async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('Login Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Login Error', err);
     }
 });
 
@@ -161,12 +156,7 @@ router.post('/admin-login', async (req, res) => {
     }
 
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('email', sql.VarChar, email.toLowerCase())
-            .query('SELECT * FROM Users WHERE Email = @email');
-
-        const user = result.recordset[0];
+        const user = await User.findOne({ Email: email.toLowerCase().trim() }).lean();
         if (!user) return res.status(404).json({ message: 'User not found.' });
 
         if (!user.IsAdmin) {
@@ -193,34 +183,28 @@ router.post('/admin-login', async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('Admin Login Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Admin Login Error', err);
     }
 });
 
 // --- 4. GET MY PROFILE ---
 router.get('/profile', auth, async (req, res) => {
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, req.user.id)
-            .query(`
-                SELECT UserID, FirstName, LastName, Email,
-                       QRCodeImage, IsAdmin, IsApproved,
-                       Bio, Course, Year, CampusArea,
-                       DateCreated, PasswordChangedAt
-                FROM Users
-                WHERE UserID = @id
-            `);
+        const user = await User.findOne(
+            { UserID: req.user.id },
+            { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1, Email: 1,
+              QRCodeImage: 1, IsAdmin: 1, IsApproved: 1,
+              Bio: 1, Course: 1, Year: 1, CampusArea: 1,
+              DateCreated: 1, PasswordChangedAt: 1 }
+        ).lean();
 
-        if (result.recordset.length === 0) {
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        res.json(result.recordset[0]);
+        res.json(user);
     } catch (err) {
-        console.error('Profile Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Profile Error', err);
     }
 });
 
@@ -233,30 +217,22 @@ router.put('/profile', auth, async (req, res) => {
     }
 
     try {
-        const pool = await poolPromise;
-        await pool.request()
-            .input('id',          sql.Int,     req.user.id)
-            .input('firstName',   sql.VarChar, firstName)
-            .input('lastName',    sql.VarChar, lastName)
-            .input('bio',         sql.NVarChar, bio         || null)
-            .input('course',      sql.NVarChar, course      || null)
-            .input('year',        sql.NVarChar, year        || null)
-            .input('campusArea',  sql.NVarChar, campusArea  || null)
-            .query(`
-                UPDATE Users
-                SET FirstName  = @firstName,
-                    LastName   = @lastName,
-                    Bio        = @bio,
-                    Course     = @course,
-                    Year       = @year,
-                    CampusArea = @campusArea
-                WHERE UserID = @id
-            `);
+        await User.updateOne(
+            { UserID: req.user.id },
+            { $set: {
+                FirstName:  firstName,
+                LastName:   lastName,
+                Bio:        bio        || null,
+                Course:     course     || null,
+                Year:       year       || null,
+                CampusArea: campusArea || null
+            } },
+            { runValidators: true }
+        );
 
         res.json({ message: 'Profile updated successfully!' });
     } catch (err) {
-        console.error('Update Profile Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Update Profile Error', err);
     }
 });
 
@@ -266,31 +242,22 @@ router.post('/qr', auth, qrUpload.single('qrCode'), async (req, res) => {
         return res.status(400).json({ message: 'No QR code image uploaded.' });
     }
 
-    const newQRUrl = `http://localhost:5000/uploads/qrcodes/${req.file.filename}`;
+    const newQRUrl = `${BASE_URL}/uploads/qrcodes/${req.file.filename}`;
 
     try {
-        const pool = await poolPromise;
-
-        const old = await pool.request()
-            .input('id', sql.Int, req.user.id)
-            .query('SELECT QRCodeImage FROM Users WHERE UserID = @id');
-
-        const oldQR = old.recordset[0]?.QRCodeImage;
+        const old   = await User.findOne({ UserID: req.user.id }, { QRCodeImage: 1 }).lean();
+        const oldQR = old?.QRCodeImage;
         if (oldQR && oldQR.includes('/uploads/qrcodes/')) {
             const oldFilename = oldQR.split('/uploads/qrcodes/')[1];
             const oldPath     = path.join(qrDir, oldFilename);
             if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
         }
 
-        await pool.request()
-            .input('id',    sql.Int,     req.user.id)
-            .input('qrUrl', sql.VarChar, newQRUrl)
-            .query('UPDATE Users SET QRCodeImage = @qrUrl WHERE UserID = @id');
+        await User.updateOne({ UserID: req.user.id }, { $set: { QRCodeImage: newQRUrl } });
 
         res.json({ message: 'QR code updated!', qrCodeImage: newQRUrl });
     } catch (err) {
-        console.error('QR Upload Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'QR Upload Error', err);
     }
 });
 
@@ -307,12 +274,7 @@ router.put('/change-password', auth, async (req, res) => {
     }
 
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, req.user.id)
-            .query('SELECT Password FROM Users WHERE UserID = @id');
-
-        const user = result.recordset[0];
+        const user = await User.findOne({ UserID: req.user.id }, { Password: 1 }).lean();
         if (!user) return res.status(404).json({ message: 'User not found.' });
 
         const isMatch = await bcrypt.compare(currentPassword, user.Password);
@@ -321,39 +283,36 @@ router.put('/change-password', auth, async (req, res) => {
         const salt           = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        await pool.request()
-            .input('id',       sql.Int,     req.user.id)
-            .input('password', sql.VarChar, hashedPassword)
-            .query(`UPDATE Users SET Password = @password, PasswordChangedAt = GETDATE() WHERE UserID = @id`);
+        await User.updateOne(
+            { UserID: req.user.id },
+            { $set: { Password: hashedPassword, PasswordChangedAt: new Date() } }
+        );
 
         res.json({ message: 'Password changed successfully!' });
     } catch (err) {
-        console.error('Change Password Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Change Password Error', err);
     }
 });
 
 // --- 8. GET ANY USER'S PUBLIC PROFILE ---
 router.get('/:id', async (req, res) => {
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, parseInt(req.params.id))
-            .query(`
-                SELECT UserID, FirstName, LastName,
-                       QRCodeImage, Bio, Course, Year, CampusArea, DateCreated
-                FROM Users
-                WHERE UserID = @id
-            `);
+        const id = toInt(req.params.id);
+        if (id === null) return res.status(404).json({ message: 'User not found.' });
 
-        if (result.recordset.length === 0) {
+        const user = await User.findOne(
+            { UserID: id },
+            { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1,
+              QRCodeImage: 1, Bio: 1, Course: 1, Year: 1, CampusArea: 1, DateCreated: 1 }
+        ).lean();
+
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        res.json(result.recordset[0]);
+        res.json(user);
     } catch (err) {
-        console.error('Get User Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get User Error', err);
     }
 });
 

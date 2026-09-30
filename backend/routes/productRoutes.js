@@ -1,10 +1,10 @@
-const express = require('express');
 const router  = require('express').Router();
 const auth    = require('../middleware/auth');
-const { poolPromise, sql } = require('../config/db');
 const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
+const { Product, Category, User, SavedItem, Transaction, nextId, NO_ID } = require('../models');
+const { BASE_URL, toInt, escapeRegex, indexBy, sendError } = require('../utils/helpers');
 
 // ============================================================
 // MULTER — product images saved to /uploads/products
@@ -32,20 +32,25 @@ const productImgUpload = multer({
 });
 
 // ============================================================
-// HELPER — insert images into ProductImages table
+// HELPER — build the embedded `images` array for a product
+// (replaces the old ProductImages table; SortOrder 0 = primary/thumbnail)
 // ============================================================
-async function insertProductImages(pool, productID, files) {
+async function buildImages(files) {
+    const images = [];
     for (let i = 0; i < files.length; i++) {
-        const imageURL = `http://localhost:5000/uploads/products/${files[i].filename}`;
-        await pool.request()
-            .input('productID', sql.Int,     productID)
-            .input('imageURL',  sql.VarChar, imageURL)
-            .input('sortOrder', sql.Int,     i) // 0 = primary/thumbnail
-            .query(`
-                INSERT INTO ProductImages (ProductID, ImageURL, SortOrder)
-                VALUES (@productID, @imageURL, @sortOrder)
-            `);
+        images.push({
+            ImageID:   await nextId('ImageID'),
+            ImageURL:  `${BASE_URL}/uploads/products/${files[i].filename}`,
+            SortOrder: i
+        });
     }
+    return images;
+}
+
+// Images are stored inside the product doc; always return them sorted
+function sortImages(product) {
+    product.images = (product.images || []).slice().sort((a, b) => a.SortOrder - b.SortOrder);
+    return product;
 }
 
 // ============================================================
@@ -59,6 +64,19 @@ function deleteImageFile(imageURL) {
     }
 }
 
+// Attach CategoryName (LEFT JOIN Categories) to a list of product docs
+async function withCategoryNames(products) {
+    const categories = await Category.find(
+        { CategoryID: { $in: [...new Set(products.map(p => p.CategoryID))] } }, NO_ID
+    ).lean();
+    const categoryMap = indexBy(categories, 'CategoryID');
+
+    return products.map(p => sortImages({
+        ...p,
+        CategoryName: categoryMap.get(p.CategoryID)?.CategoryName ?? null
+    }));
+}
+
 // ============================================================
 // ROUTES
 // ============================================================
@@ -66,66 +84,35 @@ function deleteImageFile(imageURL) {
 // --- 1. GET ALL PRODUCTS (Public) ---
 // Only shows 'Available' products by default (approved + not sold)
 // Supports: ?search= ?category= ?condition= ?minPrice= ?maxPrice= ?sort=
-// Each product includes its images array from ProductImages
+// Each product includes its images array
 router.get('/', async (req, res) => {
     const { search, category, condition, minPrice, maxPrice, sort } = req.query;
 
     try {
-        const pool    = await poolPromise;
-        const request = pool.request();
-
-        let query = `
-            SELECT p.*, c.CategoryName
-            FROM Products p
-            LEFT JOIN Categories c ON p.CategoryID = c.CategoryID
-            WHERE p.Status = 'Available'`;
+        const filter = { Status: 'Available' };
 
         if (search) {
-            request.input('search', sql.VarChar, `%${search}%`);
-            query += ` AND (p.ProductName LIKE @search OR p.Description LIKE @search OR p.sellerName LIKE @search)`;
+            const rx = new RegExp(escapeRegex(search), 'i');
+            filter.$or = [{ ProductName: rx }, { Description: rx }, { sellerName: rx }];
         }
-        if (category) {
-            request.input('category', sql.Int, parseInt(category));
-            query += ` AND p.CategoryID = @category`;
-        }
-        if (condition) {
-            request.input('condition', sql.VarChar, condition);
-            query += ` AND p.ProductCondition = @condition`;
-        }
-        if (minPrice) {
-            request.input('minPrice', sql.Decimal(10, 2), parseFloat(minPrice));
-            query += ` AND p.Price >= @minPrice`;
-        }
-        if (maxPrice) {
-            request.input('maxPrice', sql.Decimal(10, 2), parseFloat(maxPrice));
-            query += ` AND p.Price <= @maxPrice`;
-        }
+        if (category)  filter.CategoryID = toInt(category) ?? -1; // invalid id -> no matches
+        if (condition) filter.ProductCondition = String(condition);
 
-        if (sort === 'price_asc')       query += ` ORDER BY p.Price ASC`;
-        else if (sort === 'price_desc') query += ` ORDER BY p.Price DESC`;
-        else if (sort === 'oldest')     query += ` ORDER BY p.DatePosted ASC`;
-        else                            query += ` ORDER BY p.DatePosted DESC`; // default: newest
+        const price = {};
+        if (minPrice && !Number.isNaN(parseFloat(minPrice))) price.$gte = parseFloat(minPrice);
+        if (maxPrice && !Number.isNaN(parseFloat(maxPrice))) price.$lte = parseFloat(maxPrice);
+        if (Object.keys(price).length) filter.Price = price;
 
-        const result = await request.query(query);
-        const products = result.recordset;
+        let sortBy;
+        if (sort === 'price_asc')       sortBy = { Price: 1 };
+        else if (sort === 'price_desc') sortBy = { Price: -1 };
+        else if (sort === 'oldest')     sortBy = { DatePosted: 1 };
+        else                            sortBy = { DatePosted: -1 }; // default: newest
 
-        // Attach images array to each product
-        for (const product of products) {
-            const imgs = await pool.request()
-                .input('productID', sql.Int, product.ProductID)
-                .query(`
-                    SELECT ImageID, ImageURL, SortOrder
-                    FROM ProductImages
-                    WHERE ProductID = @productID
-                    ORDER BY SortOrder ASC
-                `);
-            product.images = imgs.recordset;
-        }
-
-        res.json(products);
+        const products = await Product.find(filter, NO_ID).sort(sortBy).lean();
+        res.json(await withCategoryNames(products));
     } catch (err) {
-        console.error('Get Products Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Products Error', err);
     }
 });
 
@@ -134,36 +121,13 @@ router.get('/', async (req, res) => {
 // Must be defined before /:id to avoid route conflict
 router.get('/my/listings', auth, async (req, res) => {
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('UserID', sql.Int, req.user.id)
-            .query(`
-                SELECT p.*, c.CategoryName
-                FROM Products p
-                LEFT JOIN Categories c ON p.CategoryID = c.CategoryID
-                WHERE p.UserID = @UserID
-                ORDER BY p.DatePosted DESC
-            `);
+        const products = await Product.find({ UserID: req.user.id }, NO_ID)
+            .sort({ DatePosted: -1 })
+            .lean();
 
-        const products = result.recordset;
-
-        // Attach images to each listing
-        for (const product of products) {
-            const imgs = await pool.request()
-                .input('productID', sql.Int, product.ProductID)
-                .query(`
-                    SELECT ImageID, ImageURL, SortOrder
-                    FROM ProductImages
-                    WHERE ProductID = @productID
-                    ORDER BY SortOrder ASC
-                `);
-            product.images = imgs.recordset;
-        }
-
-        res.json(products);
+        res.json(await withCategoryNames(products));
     } catch (err) {
-        console.error('My Listings Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'My Listings Error', err);
     }
 });
 
@@ -171,37 +135,28 @@ router.get('/my/listings', auth, async (req, res) => {
 // Returns product + seller QR code + all images
 router.get('/:id', async (req, res) => {
     try {
-        const pool   = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, parseInt(req.params.id))
-            .query(`
-                SELECT p.*, u.QRCodeImage, u.FirstName AS SellerFirstName, u.LastName AS SellerLastName
-                FROM Products p
-                JOIN Users u ON p.UserID = u.UserID
-                WHERE p.ProductID = @id
-            `);
+        const id = toInt(req.params.id);
+        if (id === null) return res.status(404).json({ message: 'Product not found.' });
 
-        if (result.recordset.length === 0) {
+        const product = await Product.findOne({ ProductID: id }, NO_ID).lean();
+        const seller  = product && await User.findOne(
+            { UserID: product.UserID },
+            { ...NO_ID, QRCodeImage: 1, FirstName: 1, LastName: 1 }
+        ).lean();
+
+        // Old query was an INNER JOIN on Users, so a product without a seller = not found
+        if (!product || !seller) {
             return res.status(404).json({ message: 'Product not found.' });
         }
 
-        const product = result.recordset[0];
-
-        // Attach images
-        const imgs = await pool.request()
-            .input('productID', sql.Int, product.ProductID)
-            .query(`
-                SELECT ImageID, ImageURL, SortOrder
-                FROM ProductImages
-                WHERE ProductID = @productID
-                ORDER BY SortOrder ASC
-            `);
-        product.images = imgs.recordset;
-
-        res.json(product);
+        res.json(sortImages({
+            ...product,
+            QRCodeImage:     seller.QRCodeImage,
+            SellerFirstName: seller.FirstName,
+            SellerLastName:  seller.LastName
+        }));
     } catch (err) {
-        console.error('Get Product Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Product Error', err);
     }
 });
 
@@ -214,9 +169,11 @@ router.post('/add', auth, productImgUpload.array('productImages', 5), async (req
     const { productName, price, description, productCondition, categoryID, quantity } = req.body;
     const files = req.files || [];
 
+    const cleanupFiles = () =>
+        files.forEach(f => deleteImageFile(`${BASE_URL}/uploads/products/${f.filename}`));
+
     if (!productName || !price || !productCondition || !categoryID) {
-        // Clean up any uploaded files if validation fails
-        files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
+        cleanupFiles();
         return res.status(400).json({ message: 'ProductName, Price, ProductCondition, and CategoryID are required.' });
     }
 
@@ -225,60 +182,51 @@ router.post('/add', auth, productImgUpload.array('productImages', 5), async (req
     }
 
     if (files.length > 5) {
-        files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
+        cleanupFiles();
         return res.status(400).json({ message: 'Maximum 5 images allowed.' });
     }
 
     const userID = req.user.id;
 
     try {
-        const pool = await poolPromise;
+        // MongoDB has no foreign keys, so check the category ourselves
+        const categoryExists = await Category.exists({ CategoryID: toInt(categoryID) });
+        if (!categoryExists) {
+            cleanupFiles();
+            return res.status(400).json({ message: 'Invalid category.' });
+        }
 
         // Get seller name from DB — never trust the client
-        const userResult = await pool.request()
-            .input('id', sql.Int, userID)
-            .query('SELECT FirstName, LastName FROM Users WHERE UserID = @id');
-
-        const user       = userResult.recordset[0];
+        const user       = await User.findOne({ UserID: userID }, { FirstName: 1, LastName: 1 }).lean();
         const sellerName = user ? `${user.FirstName} ${user.LastName}` : 'Unknown';
 
-        // Primary image (first upload) stored on Products.ImageURL for backwards compat
-        const primaryImageURL = `http://localhost:5000/uploads/products/${files[0].filename}`;
+        // Primary image (first upload) stored on Product.ImageURL for backwards compat
+        const primaryImageURL = `${BASE_URL}/uploads/products/${files[0].filename}`;
+        const productID       = await nextId('ProductID');
 
-        const result = await pool.request()
-            .input('userID',           sql.Int,           userID)
-            .input('categoryID',       sql.Int,           parseInt(categoryID))
-            .input('productName',      sql.VarChar,       productName)
-            .input('description',      sql.VarChar,       description      || null)
-            .input('price',            sql.Decimal(10, 2), parseFloat(price))
-            .input('productCondition', sql.VarChar,       productCondition)
-            .input('quantity',         sql.Int,           parseInt(quantity) || 1)
-            .input('imageURL',         sql.VarChar,       primaryImageURL)
-            .input('sellerName',       sql.VarChar,       sellerName)
-            .query(`
-                INSERT INTO Products
-                    (UserID, CategoryID, ProductName, Description, Price,
-                     ProductCondition, Quantity, ImageURL, Status, sellerName)
-                OUTPUT INSERTED.ProductID
-                VALUES
-                    (@userID, @categoryID, @productName, @description, @price,
-                     @productCondition, @quantity, @imageURL, 'Pending Approval', @sellerName)
-            `);
-
-        const newProductID = result.recordset[0].ProductID;
-
-        // Insert all images into ProductImages table
-        await insertProductImages(pool, newProductID, files);
+        await Product.create({
+            ProductID:        productID,
+            UserID:           userID,
+            CategoryID:       toInt(categoryID),
+            ProductName:      productName,
+            sellerName,
+            Description:      description || null,
+            Price:            parseFloat(price),
+            ProductCondition: productCondition,
+            Quantity:         parseInt(quantity) || 1,
+            ImageURL:         primaryImageURL,
+            Status:           'Pending Approval',
+            images:           await buildImages(files)
+        });
 
         res.status(201).json({
             message:   'Listing submitted for admin approval!',
-            productId: newProductID
+            productId: productID
         });
     } catch (err) {
         // Clean up uploaded files on DB error
-        files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
-        console.error('Add Product Error:', err.message);
-        res.status(500).json({ error: err.message });
+        cleanupFiles();
+        sendError(res, 'Add Product Error', err);
     }
 });
 
@@ -287,126 +235,105 @@ router.post('/add', auth, productImgUpload.array('productImages', 5), async (req
 // If no new images uploaded, existing images are kept
 router.put('/:id', auth, productImgUpload.array('productImages', 5), async (req, res) => {
     const { productName, price, description, productCondition, categoryID, quantity } = req.body;
-    const productId = parseInt(req.params.id);
+    const productId = toInt(req.params.id);
     const userID    = req.user.id;
     const files     = req.files || [];
 
+    const cleanupFiles = () =>
+        files.forEach(f => deleteImageFile(`${BASE_URL}/uploads/products/${f.filename}`));
+
     if (!productName || !price || !productCondition || !categoryID) {
-        files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
+        cleanupFiles();
         return res.status(400).json({ message: 'ProductName, Price, ProductCondition, and CategoryID are required.' });
     }
 
     if (files.length > 5) {
-        files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
+        cleanupFiles();
         return res.status(400).json({ message: 'Maximum 5 images allowed.' });
     }
 
     try {
-        const pool = await poolPromise;
-
         // Verify ownership
-        const check = await pool.request()
-            .input('id', sql.Int, productId)
-            .query('SELECT UserID, ImageURL FROM Products WHERE ProductID = @id');
+        const existing = productId === null ? null
+            : await Product.findOne({ ProductID: productId }, { UserID: 1, ImageURL: 1, images: 1 }).lean();
 
-        if (check.recordset.length === 0) {
+        if (!existing) {
+            cleanupFiles();
             return res.status(404).json({ message: 'Product not found.' });
         }
-        if (check.recordset[0].UserID !== userID) {
-            files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
+        if (existing.UserID !== userID) {
+            cleanupFiles();
             return res.status(403).json({ message: 'Unauthorized: You do not own this listing.' });
         }
 
-        let primaryImageURL = check.recordset[0].ImageURL;
-
-        // If new images uploaded — delete old ones and replace
-        if (files.length > 0) {
-            // Get existing images from ProductImages
-            const oldImgs = await pool.request()
-                .input('productID', sql.Int, productId)
-                .query('SELECT ImageURL FROM ProductImages WHERE ProductID = @productID');
-
-            // Delete old files from disk
-            oldImgs.recordset.forEach(img => deleteImageFile(img.ImageURL));
-
-            // Delete old records from DB
-            await pool.request()
-                .input('productID', sql.Int, productId)
-                .query('DELETE FROM ProductImages WHERE ProductID = @productID');
-
-            // Insert new images
-            await insertProductImages(pool, productId, files);
-
-            primaryImageURL = `http://localhost:5000/uploads/products/${files[0].filename}`;
+        const categoryExists = await Category.exists({ CategoryID: toInt(categoryID) });
+        if (!categoryExists) {
+            cleanupFiles();
+            return res.status(400).json({ message: 'Invalid category.' });
         }
 
-        // Update product — editing resets status to Pending Approval
-        await pool.request()
-            .input('id',               sql.Int,            productId)
-            .input('productName',      sql.VarChar,        productName)
-            .input('price',            sql.Decimal(10, 2), parseFloat(price))
-            .input('description',      sql.VarChar,        description      || null)
-            .input('productCondition', sql.VarChar,        productCondition)
-            .input('categoryID',       sql.Int,            parseInt(categoryID))
-            .input('quantity',         sql.Int,            parseInt(quantity) || 1)
-            .input('imageURL',         sql.VarChar,        primaryImageURL  || null)
-            .query(`
-                UPDATE Products
-                SET ProductName      = @productName,
-                    Price            = @price,
-                    Description      = @description,
-                    ProductCondition = @productCondition,
-                    CategoryID       = @categoryID,
-                    Quantity         = @quantity,
-                    ImageURL         = @imageURL,
-                    Status           = 'Pending Approval'
-                WHERE ProductID = @id
-            `);
+        const update = {
+            ProductName:      productName,
+            Price:            parseFloat(price),
+            Description:      description || null,
+            ProductCondition: productCondition,
+            CategoryID:       toInt(categoryID),
+            Quantity:         parseInt(quantity) || 1,
+            ImageURL:         existing.ImageURL || null,
+            Status:           'Pending Approval' // editing resets status to Pending Approval
+        };
+
+        // If new images uploaded — replace all the old ones
+        if (files.length > 0) {
+            update.images   = await buildImages(files);
+            update.ImageURL = `${BASE_URL}/uploads/products/${files[0].filename}`;
+        }
+
+        await Product.updateOne({ ProductID: productId }, { $set: update }, { runValidators: true });
+
+        // Only delete the old files from disk once the DB update has succeeded
+        if (files.length > 0) {
+            (existing.images || []).forEach(img => deleteImageFile(img.ImageURL));
+        }
 
         res.json({ message: 'Product updated! Re-submitted for admin approval.' });
     } catch (err) {
-        files.forEach(f => deleteImageFile(`http://localhost:5000/uploads/products/${f.filename}`));
-        console.error('Edit Product Error:', err.message);
-        res.status(500).json({ error: err.message });
+        cleanupFiles();
+        sendError(res, 'Edit Product Error', err);
     }
 });
 
 // --- 6. DELETE A PRODUCT (Private - Owner only) ---
-// Also deletes all associated images from disk and ProductImages table
+// Images are embedded in the product, so they go with it; files are removed from disk too
 router.delete('/:id', auth, async (req, res) => {
-    const productId = parseInt(req.params.id);
+    const productId = toInt(req.params.id);
     const userID    = req.user.id;
 
     try {
-        const pool = await poolPromise;
+        const product = productId === null ? null
+            : await Product.findOne({ ProductID: productId }, { UserID: 1, images: 1 }).lean();
 
-        const check = await pool.request()
-            .input('id', sql.Int, productId)
-            .query('SELECT UserID FROM Products WHERE ProductID = @id');
-
-        if (check.recordset.length === 0) {
+        if (!product) {
             return res.status(404).json({ message: 'Product not found.' });
         }
-        if (check.recordset[0].UserID !== userID) {
+        if (product.UserID !== userID) {
             return res.status(403).json({ message: 'Unauthorized: You do not own this listing.' });
         }
 
-        // Delete image files from disk
-        const imgs = await pool.request()
-            .input('productID', sql.Int, productId)
-            .query('SELECT ImageURL FROM ProductImages WHERE ProductID = @productID');
+        // SQL Server blocked this with a foreign key; MongoDB won't, so enforce it here
+        const hasTransactions = await Transaction.exists({ ProductID: productId });
+        if (hasTransactions) {
+            return res.status(400).json({ message: 'This listing has purchase records and cannot be deleted.' });
+        }
 
-        imgs.recordset.forEach(img => deleteImageFile(img.ImageURL));
+        (product.images || []).forEach(img => deleteImageFile(img.ImageURL));
 
-        // ProductImages rows deleted automatically via ON DELETE CASCADE
-        await pool.request()
-            .input('id', sql.Int, productId)
-            .query('DELETE FROM Products WHERE ProductID = @id');
+        await Product.deleteOne({ ProductID: productId });
+        await SavedItem.deleteMany({ ProductID: productId });
 
         res.json({ message: 'Product deleted successfully!' });
     } catch (err) {
-        console.error('Delete Product Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Delete Product Error', err);
     }
 });
 
