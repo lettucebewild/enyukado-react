@@ -1,38 +1,40 @@
 const express = require('express');
 const router = express.Router();
-const { poolPromise, sql } = require('../config/db');
+const { Category, NO_ID } = require('../models');
+const { toInt, sendError } = require('../utils/helpers');
 
 // --- GET ALL CATEGORIES (Public) ---
 // Used by the frontend to populate listing form dropdowns
 router.get('/', async (req, res) => {
     try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .query('SELECT CategoryID, CategoryName FROM Categories ORDER BY CategoryName ASC');
+        const categories = await Category
+            .find({}, { ...NO_ID, CategoryID: 1, CategoryName: 1 })
+            .sort({ CategoryName: 1 })
+            .lean();
 
-        res.json(result.recordset);
+        res.json(categories);
     } catch (err) {
-        console.error('Get Categories Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Categories Error', err);
     }
 });
 
 // --- GET SINGLE CATEGORY BY ID (Public) ---
 router.get('/:id', async (req, res) => {
     try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, parseInt(req.params.id))
-            .query('SELECT CategoryID, CategoryName FROM Categories WHERE CategoryID = @id');
+        const id = toInt(req.params.id);
+        if (id === null) return res.status(404).json({ message: 'Category not found.' });
 
-        if (result.recordset.length === 0) {
+        const category = await Category
+            .findOne({ CategoryID: id }, { ...NO_ID, CategoryID: 1, CategoryName: 1 })
+            .lean();
+
+        if (!category) {
             return res.status(404).json({ message: 'Category not found.' });
         }
 
-        res.json(result.recordset[0]);
+        res.json(category);
     } catch (err) {
-        console.error('Get Category Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Category Error', err);
     }
 });
 

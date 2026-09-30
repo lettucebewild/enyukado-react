@@ -1,7 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { poolPromise, sql } = require('../config/db');
+const { Review, Transaction, User, Product, nextId, NO_ID } = require('../models');
+const { toInt, indexBy, sendError } = require('../utils/helpers');
+
+// Build the review shape the frontend expects (review + reviewer name + product name)
+async function toReviewRows(reviews) {
+    const transactions = await Transaction.find(
+        { TransactionID: { $in: reviews.map(r => r.TransactionID) } }, NO_ID
+    ).lean();
+    const [reviewers, products] = await Promise.all([
+        User.find({ UserID: { $in: reviews.map(r => r.ReviewerID) } }, { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1 }).lean(),
+        Product.find({ ProductID: { $in: transactions.map(t => t.ProductID) } }, { ...NO_ID, ProductID: 1, ProductName: 1 }).lean()
+    ]);
+
+    const txMap       = indexBy(transactions, 'TransactionID');
+    const reviewerMap = indexBy(reviewers, 'UserID');
+    const productMap  = indexBy(products, 'ProductID');
+
+    // INNER JOIN semantics: drop reviews whose transaction / reviewer / product is gone
+    const rows = [];
+    for (const r of reviews) {
+        const t = txMap.get(r.TransactionID);
+        const u = reviewerMap.get(r.ReviewerID);
+        const p = t && productMap.get(t.ProductID);
+        if (!t || !u || !p) continue;
+        rows.push({
+            ReviewID:          r.ReviewID,
+            Rating:            r.Rating,
+            Comment:           r.Comment,
+            DateCreated:       r.DateCreated,
+            ReviewerFirstName: u.FirstName,
+            ReviewerLastName:  u.LastName,
+            ProductName:       p.ProductName
+        });
+    }
+    return rows;
+}
 
 // --- 1. SUBMIT A REVIEW (Private - Buyer only) ---
 // Rules:
@@ -21,23 +56,14 @@ router.post('/', auth, async (req, res) => {
     }
 
     try {
-        const pool = await poolPromise;
-
         // Verify the transaction exists, is Completed, and the reviewer is the buyer
-        const txCheck = await pool.request()
-            .input('transactionID', sql.Int, transactionID)
-            .input('reviewerID',    sql.Int, reviewerID)
-            .query(`
-                SELECT TransactionID, BuyerID, SellerID, Status
-                FROM Transactions
-                WHERE TransactionID = @transactionID
-            `);
+        const txID = toInt(transactionID);
+        const transaction = txID === null ? null
+            : await Transaction.findOne({ TransactionID: txID }, { BuyerID: 1, SellerID: 1, Status: 1 }).lean();
 
-        if (txCheck.recordset.length === 0) {
+        if (!transaction) {
             return res.status(404).json({ message: 'Transaction not found.' });
         }
-
-        const transaction = txCheck.recordset[0];
 
         // Only the buyer can leave a review
         if (transaction.BuyerID !== reviewerID) {
@@ -50,31 +76,26 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Check if a review already exists for this transaction
-        const reviewCheck = await pool.request()
-            .input('transactionID', sql.Int, transactionID)
-            .query('SELECT ReviewID FROM Reviews WHERE TransactionID = @transactionID');
-
-        if (reviewCheck.recordset.length > 0) {
+        if (await Review.exists({ TransactionID: txID })) {
             return res.status(400).json({ message: 'You have already reviewed this transaction.' });
         }
 
-        // Insert the review
-        const result = await pool.request()
-            .input('transactionID', sql.Int,     transactionID)
-            .input('reviewerID',    sql.Int,     reviewerID)
-            .input('rating',        sql.Int,     Number(rating))
-            .input('comment',       sql.VarChar, comment || null)
-            .query(`
-                INSERT INTO Reviews (TransactionID, ReviewerID, Rating, Comment)
-                OUTPUT INSERTED.ReviewID
-                VALUES (@transactionID, @reviewerID, @rating, @comment)
-            `);
+        const reviewID = await nextId('ReviewID');
+        await Review.create({
+            ReviewID:      reviewID,
+            TransactionID: txID,
+            ReviewerID:    reviewerID,
+            Rating:        Number(rating),
+            Comment:       comment || null
+        });
 
-        const reviewID = result.recordset[0].ReviewID;
         res.status(201).json({ message: 'Review submitted successfully!', reviewId: reviewID });
     } catch (err) {
-        console.error('Submit Review Error:', err.message);
-        res.status(500).json({ error: err.message });
+        // Unique index on TransactionID — two simultaneous submissions
+        if (err.code === 11000) {
+            return res.status(400).json({ message: 'You have already reviewed this transaction.' });
+        }
+        sendError(res, 'Submit Review Error', err);
     }
 });
 
@@ -82,33 +103,21 @@ router.post('/', auth, async (req, res) => {
 // Returns all reviews received by a specific seller
 // Also returns their average rating
 router.get('/user/:userID', async (req, res) => {
-    const sellerID = parseInt(req.params.userID);
+    const sellerID = toInt(req.params.userID);
 
     try {
-        const pool = await poolPromise;
+        // Reviews where the reviewed user is the seller in the transaction
+        const sellerTx = sellerID === null ? []
+            : await Transaction.find({ SellerID: sellerID }, { TransactionID: 1 }).lean();
 
-        // Get all reviews where the reviewed user is the seller in the transaction
-        const result = await pool.request()
-            .input('sellerID', sql.Int, sellerID)
-            .query(`
-                SELECT 
-                    r.ReviewID,
-                    r.Rating,
-                    r.Comment,
-                    r.DateCreated,
-                    u.FirstName AS ReviewerFirstName,
-                    u.LastName  AS ReviewerLastName,
-                    p.ProductName
-                FROM Reviews r
-                JOIN Transactions t ON r.TransactionID = t.TransactionID
-                JOIN Users u        ON r.ReviewerID    = u.UserID
-                JOIN Products p     ON t.ProductID     = p.ProductID
-                WHERE t.SellerID = @sellerID
-                ORDER BY r.DateCreated DESC
-            `);
+        const found = await Review
+            .find({ TransactionID: { $in: sellerTx.map(t => t.TransactionID) } }, NO_ID)
+            .sort({ DateCreated: -1 })
+            .lean();
+
+        const reviews = await toReviewRows(found);
 
         // Calculate average rating
-        const reviews = result.recordset;
         const avgRating = reviews.length > 0
             ? (reviews.reduce((sum, r) => sum + r.Rating, 0) / reviews.length).toFixed(1)
             : null;
@@ -119,8 +128,7 @@ router.get('/user/:userID', async (req, res) => {
             reviews
         });
     } catch (err) {
-        console.error('Get Reviews Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Reviews Error', err);
     }
 });
 
@@ -128,87 +136,59 @@ router.get('/user/:userID', async (req, res) => {
 // Used by frontend to check if buyer already reviewed a transaction
 router.get('/transaction/:transactionID', auth, async (req, res) => {
     try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('transactionID', sql.Int, parseInt(req.params.transactionID))
-            .input('reviewerID',    sql.Int, req.user.id)
-            .query(`
-                SELECT ReviewID, Rating, Comment, DateCreated
-                FROM Reviews
-                WHERE TransactionID = @transactionID
-                AND   ReviewerID    = @reviewerID
-            `);
+        const txID = toInt(req.params.transactionID);
+        const review = txID === null ? null : await Review.findOne(
+            { TransactionID: txID, ReviewerID: req.user.id },
+            { ...NO_ID, ReviewID: 1, Rating: 1, Comment: 1, DateCreated: 1 }
+        ).lean();
 
-        if (result.recordset.length === 0) {
+        if (!review) {
             return res.status(404).json({ message: 'No review found.' });
         }
-        res.json(result.recordset[0]);
+        res.json(review);
     } catch (err) {
-        console.error('Get Review by Transaction Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Review by Transaction Error', err);
     }
 });
 
 // --- 4. GET SINGLE REVIEW BY ID (Public) ---
 router.get('/:id', async (req, res) => {
     try {
-        const pool = await poolPromise;
-        const result = await pool.request()
-            .input('id', sql.Int, parseInt(req.params.id))
-            .query(`
-                SELECT 
-                    r.ReviewID,
-                    r.Rating,
-                    r.Comment,
-                    r.DateCreated,
-                    u.FirstName AS ReviewerFirstName,
-                    u.LastName  AS ReviewerLastName,
-                    p.ProductName
-                FROM Reviews r
-                JOIN Transactions t ON r.TransactionID = t.TransactionID
-                JOIN Users u        ON r.ReviewerID    = u.UserID
-                JOIN Products p     ON t.ProductID     = p.ProductID
-                WHERE r.ReviewID = @id
-            `);
+        const id = toInt(req.params.id);
+        const review = id === null ? null : await Review.findOne({ ReviewID: id }, NO_ID).lean();
+        const rows   = review ? await toReviewRows([review]) : [];
 
-        if (result.recordset.length === 0) {
+        if (rows.length === 0) {
             return res.status(404).json({ message: 'Review not found.' });
         }
 
-        res.json(result.recordset[0]);
+        res.json(rows[0]);
     } catch (err) {
-        console.error('Get Review Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Get Review Error', err);
     }
 });
 
 // --- 5. DELETE A REVIEW (Private - Reviewer only) ---
 router.delete('/:id', auth, async (req, res) => {
-    const reviewID = parseInt(req.params.id);
-    const userID = req.user.id;
+    const reviewID = toInt(req.params.id);
+    const userID   = req.user.id;
 
     try {
-        const pool = await poolPromise;
+        const review = reviewID === null ? null
+            : await Review.findOne({ ReviewID: reviewID }, { ReviewerID: 1 }).lean();
 
-        const check = await pool.request()
-            .input('id', sql.Int, reviewID)
-            .query('SELECT ReviewerID FROM Reviews WHERE ReviewID = @id');
-
-        if (check.recordset.length === 0) {
+        if (!review) {
             return res.status(404).json({ message: 'Review not found.' });
         }
-        if (check.recordset[0].ReviewerID !== userID) {
+        if (review.ReviewerID !== userID) {
             return res.status(403).json({ message: 'Unauthorized: You did not write this review.' });
         }
 
-        await pool.request()
-            .input('id', sql.Int, reviewID)
-            .query('DELETE FROM Reviews WHERE ReviewID = @id');
+        await Review.deleteOne({ ReviewID: reviewID });
 
         res.json({ message: 'Review deleted successfully!' });
     } catch (err) {
-        console.error('Delete Review Error:', err.message);
-        res.status(500).json({ error: err.message });
+        sendError(res, 'Delete Review Error', err);
     }
 });
 

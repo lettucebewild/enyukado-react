@@ -1,18 +1,22 @@
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
-module.exports = (req, res, next) => {
-    // Get token from the header
-    const token = req.header('x-auth-token');
+// Verifies "Authorization: Bearer <token>" and sets req.user = { id, isAdmin }.
+// Same secret (and fallback) as the login routes in routes/userRoutes.js.
+module.exports = function auth(req, res, next) {
+    const header = req.headers.authorization || '';
+    const [scheme, token] = header.split(' ');
 
-    if (!token) {
-        return res.status(401).json({ message: 'No token, authorization denied' });
+    if (scheme !== 'Bearer' || !token) {
+        return res.status(401).json({ message: 'No token provided. Access denied.' });
     }
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
-        req.user = decoded; // This adds the user's ID to the request object
+        req.user = { id: decoded.id, isAdmin: !!decoded.isAdmin };
         next();
     } catch (err) {
-        res.status(401).json({ message: 'Token is not valid' });
+        const message = err.name === 'TokenExpiredError' ? 'Token expired. Please log in again.' : 'Invalid token.';
+        return res.status(401).json({ message });
     }
 };
