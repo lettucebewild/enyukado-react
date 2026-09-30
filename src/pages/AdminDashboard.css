@@ -1,0 +1,82 @@
+.admin-page { min-height: 100vh; display: flex; background: #0a0f1c; color: #e7ecf6; font-family: 'DM Sans', sans-serif; }
+
+/* ---------- sidebar ---------- */
+.admin-side {
+  width: 260px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; padding: 24px 16px;
+  display: flex; flex-direction: column; gap: 28px; background: #080d18; border-right: 1px solid #141d33;
+}
+.admin-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
+.admin-brand-name { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; }
+.admin-brand-tag { margin-left: auto; background: #111c36; border: 1px solid #1f2d4d; color: #8fb4f5; font-size: 0.72rem; font-weight: 600; padding: 3px 9px; border-radius: 99px; }
+.admin-nav { display: flex; flex-direction: column; gap: 4px; }
+.admin-navitem {
+  display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; border: 1px solid transparent;
+  background: none; color: #8894ad; cursor: pointer; font: 500 0.95rem 'DM Sans', sans-serif; text-align: left;
+}
+.admin-navitem:hover { background: #0e1730; color: #e7ecf6; }
+.admin-navitem.active { background: #111c36; border-color: #1f2d4d; color: #fff; }
+.admin-navitem.active svg { color: #60a5fa; }
+.admin-count { margin-left: auto; min-width: 24px; padding: 1px 8px; border-radius: 99px; background: #141d33; color: #8894ad; font-size: 0.78rem; text-align: center; }
+.admin-count.has { background: #2f6fe0; color: #fff; }
+.admin-side-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 8px; }
+.admin-who { font-size: 0.9rem; color: #b4bfd6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- main ---------- */
+.admin-main { flex: 1; min-width: 0; max-width: 1000px; padding: 40px 40px 64px; }
+.admin-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.admin-head h1 { font-family: 'Sora', sans-serif; font-size: 1.9rem; letter-spacing: -0.03em; margin-bottom: 6px; }
+.admin-head p { color: #7c88a3; font-size: 0.98rem; }
+.admin-search {
+  width: 100%; height: 48px; padding: 0 16px; margin-bottom: 18px; border-radius: 10px; background: #0c1326; border: 1px solid #1c2a48;
+  color: #f1f5fb; font: 0.95rem 'DM Sans', sans-serif; outline: none;
+}
+.admin-search::placeholder { color: #5d6a87; }
+.admin-search:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+
+.admin-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.admin-row { display: flex; gap: 18px; align-items: flex-start; padding: 18px; background: #0d1528; border: 1px solid #1a2643; border-radius: 12px; }
+.admin-thumb { width: 88px; height: 88px; flex-shrink: 0; padding: 0; border: 1px solid #1f2d4d; border-radius: 10px; overflow: hidden; background: #0c1326; cursor: zoom-in; }
+.admin-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.admin-row-body { flex: 1; min-width: 0; }
+.admin-row-body h3 { font-family: 'Sora', sans-serif; font-size: 1.02rem; margin-bottom: 6px; }
+.admin-row-body p { font-size: 0.9rem; color: #8894ad; line-height: 1.55; overflow-wrap: anywhere; }
+.admin-proof { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; padding: 0; background: none; border: none; color: #60a5fa; font: 500 0.9rem 'DM Sans', sans-serif; cursor: zoom-in; }
+.admin-proof img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid #1f2d4d; }
+.admin-actions { display: flex; flex-direction: column; gap: 8px; }
+.admin-empty { text-align: center; padding: 64px 0; color: #6f7c99; }
+
+/* ---------- buttons ---------- */
+.admin-btn { padding: 9px 18px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; font: 600 0.88rem 'Sora', sans-serif; transition: background 0.2s, opacity 0.2s; }
+.admin-btn:disabled { opacity: 0.45; cursor: default; }
+.admin-btn:focus-visible, .admin-navitem:focus-visible, .admin-thumb:focus-visible, .admin-proof:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.admin-btn.primary { background: #2f6fe0; color: #fff; }
+.admin-btn.primary:hover:not(:disabled) { background: #2a62c8; }
+.admin-btn.danger { background: none; color: #ef8a94; border-color: #4a1f34; }
+.admin-btn.danger:hover:not(:disabled) { background: #26101f; }
+.admin-btn.danger.solid { background: #c8403a; color: #fff; border-color: #c8403a; }
+.admin-btn.danger.solid:hover:not(:disabled) { background: #a93530; }
+.admin-btn.ghost { background: none; color: #b4bfd6; border-color: #1f2d4d; }
+.admin-btn.ghost:hover { background: #111c36; }
+
+/* ---------- overlays ---------- */
+.admin-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(4,7,14,0.78); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.admin-preview { max-width: 100%; max-height: 90vh; border-radius: 10px; }
+.admin-modal { width: 100%; max-width: 440px; background: #0d1528; border: 1px solid #1f2d4d; border-radius: 14px; padding: 26px; display: flex; flex-direction: column; gap: 12px; }
+.admin-modal h2 { font-family: 'Sora', sans-serif; font-size: 1.2rem; letter-spacing: -0.02em; }
+.admin-modal p { font-size: 0.92rem; color: #8894ad; }
+.admin-modal textarea { width: 100%; padding: 12px; border: 1px solid #1c2a48; border-radius: 10px; background: #0c1326; color: #f1f5fb; font: 0.92rem 'DM Sans', sans-serif; resize: vertical; outline: none; }
+.admin-modal textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+.admin-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* ---------- small screens: sidebar becomes a top bar ---------- */
+@media (max-width: 860px) {
+  .admin-page { flex-direction: column; }
+  .admin-side { width: 100%; height: auto; position: static; padding: 16px; gap: 14px; border-right: none; border-bottom: 1px solid #141d33; }
+  .admin-nav { flex-direction: row; overflow-x: auto; }
+  .admin-navitem { flex-shrink: 0; }
+  .admin-side-foot { margin-top: 0; }
+  .admin-main { padding: 24px 16px 48px; }
+  .admin-row { flex-wrap: wrap; }
+  .admin-actions { flex-direction: row; width: 100%; }
+  .admin-actions .admin-btn { flex: 1; }
+}

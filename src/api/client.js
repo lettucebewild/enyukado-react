@@ -6,9 +6,8 @@ const BASE = '/api';
 async function request(path, { method = 'GET', body, token, isForm = false } = {}) {
   const headers = {};
   if (!isForm) headers['Content-Type'] = 'application/json';
-  // The Express backend's auth middleware reads the token from 'x-auth-token'
-  // (not the standard 'Authorization' header) — match that here.
-  if (token) headers['x-auth-token'] = token;
+  // backend/middleware/auth.js expects "Authorization: Bearer <token>".
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, {
     method,

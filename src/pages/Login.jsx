@@ -240,7 +240,7 @@ export default function Login() {
             {mode === 'login' && (
               <form className="form-card" onSubmit={handleLogin}>
                 <div className="form-header">
-                  <h2>Log in</h2>
+                  <h2>Student Login</h2>
                   <p>Access your campus marketplace.</p>
                 </div>
 
@@ -258,7 +258,7 @@ export default function Login() {
                     <input
                       id="loginEmail"
                       type="email"
-                      placeholder="yourname@students.national-u.edu.ph"
+                      placeholder="Enter your university email"
                       autoComplete="off"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
@@ -290,8 +290,8 @@ export default function Login() {
                 </div>
 
                 <button className="btn-primary" type="submit" disabled={loginLoading}>
+                  <LogInIcon />
                   <span>{loginLoading ? 'Logging in...' : 'Log in'}</span>
-                  <ArrowIcon />
                 </button>
 
                 <p className="switch-cta">
@@ -455,6 +455,16 @@ function PersonIcon() {
     <svg className="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function LogInIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" y1="12" x2="3" y2="12" />
     </svg>
   );
 }

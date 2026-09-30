@@ -549,3 +549,9 @@ html.scroll-page, body.scroll-page {
   .left-panel { padding: 28px 20px 36px; }
   .form-card { padding: 24px 20px; }
 }
+
+/* Edge adds its own "show password" eye inside password inputs, which overlaps our custom one. Hide it. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
