@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../hooks/useToast.js';
@@ -54,6 +54,22 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const cart = useCart();
+  const location = useLocation();
+
+  // Dashboard is the shell for the browse page AND the full-page views on top
+  // of it. Which view is showing comes from the URL (see the routes in App.jsx):
+  //   /product/:id   /messages   /messages/:userId   /cart   /sell
+  const path = location.pathname;
+  const productId = path.match(/^\/product\/([^/]+)/)?.[1] ?? null;
+  const messagesMatch = path.match(/^\/messages(?:\/([^/]+))?\/?$/);
+  const view = productId ? 'product'
+    : messagesMatch ? 'messages'
+    : /^\/cart\/?$/.test(path) ? 'cart'
+    : /^\/sell\/?$/.test(path) ? 'sell'
+    : null;
+  const chatUserId = messagesMatch?.[1] ? parseInt(messagesMatch[1], 10) : null;
+  const chatUserName = location.state?.userName || null;
+  const sellEditData = location.state?.editData || null;
   const { toast, showToast } = useToast();
 
   useEffect(() => {
@@ -82,14 +98,32 @@ export default function Dashboard() {
   const [savedIds, setSavedIds] = useState(new Set());
   const [poppedHeartId, setPoppedHeartId] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [heroSearchVisible, setHeroSearchVisible] = useState(true);
 
-  const [panelStack, setPanelStack] = useState([]);
-  const [sellModalOpen, setSellModalOpen] = useState(false);
-  const [sellEditData, setSellEditData] = useState(null);
   const [paymentProduct, setPaymentProduct] = useState(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const searchTimer = useRef(null);
+
+  // Arriving from another page's header search (e.g. Profile) with a query.
+  useEffect(() => {
+    const q = location.state?.search;
+    if (q) { setSearchInput(q); setActiveSearch(q); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The header search only fades in once the hero's own search box has
+  // scrolled out of view (so there's never two search boxes on screen).
+  useEffect(() => {
+    const el = document.querySelector('.hero-search');
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(
+      ([entry]) => setHeroSearchVisible(entry.isIntersecting),
+      { rootMargin: '-68px 0px 0px 0px' }, // ignore the part hidden under the sticky header
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const token = user?.token;
   const myUserID = user?.id ? parseInt(user.id, 10) : null;
 
@@ -150,7 +184,7 @@ export default function Dashboard() {
   // own explicit overflow the browser scrolls the *document* using <html>,
   // not <body> — so body's overflow:hidden was quietly ignored and the page
   // underneath kept scrolling. Lock both elements.
-  const anyOverlayOpen = panelStack.length > 0 || sellModalOpen || !!paymentProduct || changePasswordOpen;
+  const anyOverlayOpen = !!view || !!paymentProduct || changePasswordOpen;
   useEffect(() => {
     document.body.style.overflow = anyOverlayOpen ? 'hidden' : '';
     document.documentElement.style.overflow = anyOverlayOpen ? 'hidden' : '';
@@ -218,26 +252,42 @@ export default function Dashboard() {
     }
   }
 
-  // ---- panel stack (Shopee-style: opening a panel stacks it on top) ----
-  function pushPanel(panel) {
-    setPanelStack((s) => [...s, panel]);
+  // ---- navigation ----
+  // Every full-page view (product, messages, cart, sell) is a real URL.
+  // Going back returns to wherever the person came from; if the page was
+  // opened directly (refresh / shared link) it falls back to the dashboard.
+  function goBack() {
+    if (window.history.state && window.history.state.idx > 0) navigate(-1);
+    else navigate('/dashboard', { replace: true });
   }
-  function popPanel() {
-    setPanelStack((s) => s.slice(0, -1));
-  }
+  // Switching between messages / cart / sell from the header replaces the
+  // current entry, so the back arrow doesn't have to be pressed several times.
+  const switching = view && view !== 'product';
   function openProduct(productID) {
-    pushPanel({ type: 'product', productID });
+    navigate(`/product/${productID}`);
   }
   function openMessages(userID, userName) {
-    pushPanel({ type: 'messages', userID, userName });
+    navigate(userID ? `/messages/${userID}` : '/messages', { state: { userName }, replace: switching });
   }
   function openCart() {
-    pushPanel({ type: 'cart' });
+    navigate('/cart', { replace: switching });
   }
-
   function openSellModal(editData = null) {
-    setSellEditData(editData);
-    setSellModalOpen(true);
+    navigate('/sell', { state: { editData }, replace: switching });
+  }
+  function goHome() {
+    clearFilters();
+    if (view) navigate('/dashboard');
+  }
+  // Breadcrumb category link on the product page: back to Browse, filtered.
+  function browseCategory(categoryID) {
+    setActiveSearch('');
+    setSearchInput('');
+    setActiveCategory(categoryID);
+    if (view) navigate('/dashboard');
+    setTimeout(() => {
+      document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
   }
 
   function handleLogout() {
@@ -255,7 +305,21 @@ export default function Dashboard() {
     return [...rest, ...others];
   }, [categories]);
 
+  // Enter in the header search: close anything stacked on top, run the search
+  // right away and scroll down to the results.
+  function submitHeaderSearch(text) {
+    clearTimeout(searchTimer.current);
+    setActiveSearch(text);
+    if (view) navigate('/dashboard');
+    setTimeout(() => {
+      document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  }
+
   const headerProps = {
+    searchValue: searchInput,
+    onSearchChange: handleSearchChange,
+    onSearchSubmit: submitHeaderSearch,
     cartCount: cart.count,
     unreadCount,
     onOpenCart: openCart,
@@ -270,33 +334,34 @@ export default function Dashboard() {
   return (
     <div className="dash-body">
       {/* ===== NAVBAR ===== */}
-      <AppHeader {...headerProps} onBrandClick={clearFilters} />
+      <AppHeader {...headerProps} onBrandClick={goHome} showSearch={!heroSearchVisible} />
 
       {/* ===== MAIN ===== */}
       <main className="main">
-        <div className="hero">
-          <div className="hero-text">
-            <h2>Welcome back{user?.firstName ? `, ${user.firstName}` : ''}! 👋</h2>
-            <p>Browse listings from your fellow students, or post something you no longer need.</p>
+        <section className="hero">
+          <span className="hero-orb hero-orb-1" />
+          <span className="hero-orb hero-orb-2" />
+          <div className="hero-content">
+            <h2>Welcome back{user?.firstName ? `, ${user.firstName}` : ''}.</h2>
+            <p>Find great deals from fellow students, or give your old stuff a second life.</p>
+            <div className="hero-actions">
+              <div className="hero-search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input type="text" placeholder="Search listings…" value={searchInput} onChange={(e) => handleSearchChange(e.target.value)} />
+              </div>
+              <button className="hero-cta" onClick={() => openSellModal(null)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                Post a listing
+              </button>
+            </div>
           </div>
-          <button className="hero-cta" onClick={() => openSellModal(null)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            Post a listing
-          </button>
-        </div>
+        </section>
 
         <div className="section-header">
           <span className="section-title">Browse listings</span>
-        </div>
-
-        <div className="browse-search">
-          <div className="browse-search-icon">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-          </div>
-          <input type="text" placeholder="Search listings…" value={searchInput} onChange={(e) => handleSearchChange(e.target.value)} />
-          <div className="browse-search-arrow">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-          </div>
+          {Array.isArray(products) && !loadingProducts && (
+            <span className="section-count">{products.length} {products.length === 1 ? 'item' : 'items'}</span>
+          )}
         </div>
 
         <div className="categories-row">
@@ -346,10 +411,10 @@ export default function Dashboard() {
                   </div>
                   <div className="listing-info">
                     <h4>{p.ProductName}</h4>
-                    <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
-                    <div className="meta">
-                      <span className={`condition-dot ${condClass}`}></span>
-                      {p.ProductCondition} · {p.sellerName || 'Student Seller'}
+                    <div className="meta">{p.sellerName || 'Student Seller'}</div>
+                    <div className="listing-foot">
+                      <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
+                      {p.ProductCondition && <span className={`cond-pill ${condClass}`}>{p.ProductCondition}</span>}
                     </div>
                   </div>
                 </div>
@@ -380,66 +445,50 @@ export default function Dashboard() {
         <span>Enyukado © 2026 · Made for students, by students.</span>
       </footer>
 
-      {/* ===== FULL-SCREEN PANEL STACK ===== */}
-      {/* Panels are rendered in push order and all share the same CSS
-          z-index (.fullpanel-overlay), so later-pushed panels simply paint
-          on top of earlier ones in normal DOM order — no per-panel z-index
-          juggling needed. */}
-      {panelStack.map((panel, i) => {
-        if (panel.type === 'product') {
-          return (
-            <ProductPanel
-              key={i}
-              productID={panel.productID}
-              token={token}
-              myUserID={myUserID}
-              onBack={popPanel}
-              onPush={pushPanel}
-              onToast={showToast}
-              onOpenPayment={setPaymentProduct}
-              cart={cart}
-              headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); clearFilters(); } }}
-            />
-          );
-        }
-        if (panel.type === 'messages') {
-          return (
-            <MessagesPanel
-              key={i}
-              initialUserID={panel.userID}
-              initialUserName={panel.userName}
-              token={token}
-              myUserID={myUserID}
-              onBack={popPanel}
-              headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); clearFilters(); } }}
-            />
-          );
-        }
-        if (panel.type === 'cart') {
-          return (
-            <CartPanel
-              key={i}
-              cart={cart}
-              onBack={popPanel}
-              onOpenProduct={(id) => pushPanel({ type: 'product', productID: id })}
-              onOpenPayment={setPaymentProduct}
-              onToast={showToast}
-              headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); clearFilters(); } }}
-            />
-          );
-        }
-        return null;
-      })}
-
-      {/* ===== SELL (full page) ===== */}
+      {/* ===== FULL-PAGE VIEWS (driven by the URL) ===== */}
+      {view === 'product' && (
+        <ProductPanel
+          key={productId}
+          productID={productId}
+          token={token}
+          myUserID={myUserID}
+          onBack={goBack}
+          onPush={(panel) => { if (panel.type === 'messages') openMessages(panel.userID, panel.userName); }}
+          onToast={showToast}
+          onOpenPayment={setPaymentProduct}
+          onOpenCategory={browseCategory}
+          cart={cart}
+          headerProps={{ ...headerProps, onBrandClick: goHome }}
+        />
+      )}
+      {view === 'messages' && (
+        <MessagesPanel
+          initialUserID={chatUserId}
+          initialUserName={chatUserName}
+          token={token}
+          myUserID={myUserID}
+          onBack={goBack}
+          headerProps={{ ...headerProps, onBrandClick: goHome }}
+        />
+      )}
+      {view === 'cart' && (
+        <CartPanel
+          cart={cart}
+          onBack={goBack}
+          onOpenProduct={openProduct}
+          onOpenPayment={setPaymentProduct}
+          onToast={showToast}
+          headerProps={{ ...headerProps, onBrandClick: goHome }}
+        />
+      )}
       <SellModal
-        open={sellModalOpen}
-        onClose={() => setSellModalOpen(false)}
+        open={view === 'sell'}
+        onClose={goBack}
         categories={sortedCategories}
         token={token}
         editData={sellEditData}
         onSaved={loadProducts}
-        headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); clearFilters(); setSellModalOpen(false); } }}
+        headerProps={{ ...headerProps, onBrandClick: goHome }}
         onToast={showToast}
       />
 

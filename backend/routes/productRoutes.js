@@ -149,8 +149,13 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ message: 'Product not found.' });
         }
 
+        // The list routes attach CategoryName; this one must too, otherwise the
+        // product page falls back to showing "Others" for every item.
+        const category = await Category.findOne({ CategoryID: product.CategoryID }, NO_ID).lean();
+
         res.json(sortImages({
             ...product,
+            CategoryName:    category?.CategoryName ?? null,
             QRCodeImage:     seller.QRCodeImage,
             SellerFirstName: seller.FirstName,
             SellerLastName:  seller.LastName

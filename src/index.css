@@ -37,6 +37,10 @@ html.scroll-page, body.scroll-page {
   overflow: auto;
   background: var(--light);
 }
+/* Only <html> should scroll. If <body> is also overflow:auto it becomes its
+   own (non-scrolling) scroll container and `position: sticky` headers inside
+   it stop sticking to the top of the screen. */
+body.scroll-page { overflow: visible; }
 
 /* ==================== INTRO OVERLAY ==================== */
 .intro-overlay {

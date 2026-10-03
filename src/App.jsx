@@ -16,7 +16,17 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      {/* Dashboard is the shell for the browse page and for the full-page views
+          that sit on top of it. Each view has its own URL, so the address bar,
+          refresh, the back button and shared links all work. */}
+      <Route element={<Dashboard />}>
+        <Route path="/dashboard" />
+        <Route path="/product/:productId" />
+        <Route path="/messages" />
+        <Route path="/messages/:userId" />
+        <Route path="/cart" />
+        <Route path="/sell" />
+      </Route>
       <Route path="/profile" element={<Profile />} />
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/admin-login" element={<AdminLogin />} />

@@ -5,11 +5,6 @@ import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../hooks/useToast.js';
 import Toast from '../components/Toast.jsx';
 import AppHeader from '../components/AppHeader.jsx';
-import ProductPanel from '../components/ProductPanel.jsx';
-import MessagesPanel from '../components/MessagesPanel.jsx';
-import CartPanel from '../components/CartPanel.jsx';
-import SellModal from '../components/SellModal.jsx';
-import PaymentModal from '../components/PaymentModal.jsx';
 import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
 import EditProfileModal from '../components/EditProfileModal.jsx';
 import { getUser } from '../api/usersApi.js';
@@ -17,7 +12,6 @@ import { getReviewsForUser } from '../api/reviewsApi.js';
 import { getMyListings, getProducts } from '../api/productsApi.js';
 import { getMyPurchases } from '../api/transactionsApi.js';
 import { getSavedItems } from '../api/savedApi.js';
-import { getCategories } from '../api/categoriesApi.js';
 import { getUnreadCount } from '../api/messagesApi.js';
 import '../pages/Dashboard.css';
 import './Profile.css';
@@ -84,19 +78,10 @@ export default function Profile() {
   const [editOpen, setEditOpen] = useState(false);
   const [changePwOpen, setChangePwOpen] = useState(false);
 
-  // ---- same header/nav state the dashboard keeps: unread count, the
-  // Product/Messages/Cart panel stack, the (now full-page) Sell panel, and
-  // the Buy Now payment dialog — so the shared header works identically here.
+  // ---- header state: unread count for the Messages badge. Messages, Cart and
+  // Sell are real pages (/messages, /cart, /sell) rendered by the Dashboard
+  // shell, so the header buttons here simply navigate to them.
   const [unreadCount, setUnreadCount] = useState(0);
-  const [categories, setCategories] = useState([]);
-  const [panelStack, setPanelStack] = useState([]);
-  const [sellModalOpen, setSellModalOpen] = useState(false);
-  const [sellEditData, setSellEditData] = useState(null);
-  const [paymentProduct, setPaymentProduct] = useState(null);
-
-  useEffect(() => {
-    getCategories().then(setCategories).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -107,26 +92,19 @@ export default function Profile() {
     return () => clearInterval(interval);
   }, [token]);
 
-  function pushPanel(panel) {
-    setPanelStack((s) => [...s, panel]);
-  }
-  function popPanel() {
-    setPanelStack((s) => s.slice(0, -1));
-  }
   function openCart() {
-    pushPanel({ type: 'cart' });
+    navigate('/cart');
   }
   function openMessages(userID, userName) {
-    pushPanel({ type: 'messages', userID, userName });
+    navigate(userID ? `/messages/${userID}` : '/messages', { state: { userName } });
   }
   function openSellModal(data = null) {
-    setSellEditData(data);
-    setSellModalOpen(true);
+    navigate('/sell', { state: { editData: data } });
   }
 
   // Lock background scroll while a modal is open here too — see the fix note
   // in Dashboard.jsx for why *both* elements need locking.
-  const anyOverlayOpen = editOpen || changePwOpen || panelStack.length > 0 || sellModalOpen || !!paymentProduct;
+  const anyOverlayOpen = editOpen || changePwOpen;
   useEffect(() => {
     document.body.style.overflow = anyOverlayOpen ? 'hidden' : '';
     document.documentElement.style.overflow = anyOverlayOpen ? 'hidden' : '';
@@ -223,10 +201,6 @@ export default function Profile() {
   const initials = profile?.FirstName && profile?.LastName
     ? (profile.FirstName[0] + profile.LastName[0]).toUpperCase()
     : '?';
-  const subLine = useMemo(
-    () => [profile?.Course, profile?.Year, profile?.CampusArea].filter(Boolean).join(' · ') || 'NU Manila Student',
-    [profile]
-  );
   const memberSince = profile?.DateCreated
     ? new Date(profile.DateCreated).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : null;
@@ -236,7 +210,6 @@ export default function Profile() {
     if (profile?.Course) t.push({ icon: '🎓', label: profile.Course });
     if (profile?.Year) t.push({ icon: '📚', label: profile.Year });
     if (profile?.CampusArea) t.push({ icon: '📍', label: profile.CampusArea });
-    t.push({ icon: '🏫', label: 'NU Manila' });
     return t;
   }, [profile]);
 
@@ -262,7 +235,6 @@ export default function Profile() {
         { id: 'purchases', label: 'Purchases', icon: '🛍️', count: purchases.length },
         { id: 'saved', label: 'Saved', icon: '❤️', count: saved.length },
         { id: 'reviews', label: 'Reviews', icon: '⭐', count: reviews.length },
-        { id: 'settings', label: 'Settings', icon: '⚙️', count: null },
       ]
     : [
         { id: 'listings', label: 'Listings', icon: '📦', count: listings.length },
@@ -301,11 +273,12 @@ export default function Profile() {
     onProfile: () => navigate('/profile'),
     onChangePassword: () => setChangePwOpen(true),
     onLogout: handleLogout,
+    onSearchSubmit: (q) => navigate('/dashboard', { state: { search: q } }),
   };
 
   return (
     <div className="profile-page">
-      <AppHeader {...headerProps} onBrandClick={() => navigate('/dashboard')} />
+      <AppHeader {...headerProps} active="none" onBrandClick={() => navigate('/dashboard')} />
 
       <main className="profile-main">
         {!profile ? (
@@ -328,10 +301,7 @@ export default function Profile() {
                   )}
                 </div>
                 <div className="profile-name">{profile.FirstName} {profile.LastName}</div>
-                <div className="profile-handle">
-                  {subLine}
-                  {memberSince && ` · Member since ${memberSince}`}
-                </div>
+                {memberSince && <div className="profile-handle">Member since {memberSince}</div>}
                 {profile.Bio && <div className="profile-bio">{profile.Bio}</div>}
                 <div className="profile-tags">
                   {tags.map((t, i) => (
@@ -485,111 +455,10 @@ export default function Profile() {
                   })}
                 </div>
               )
-            ) : (
-              <div className="settings-tab">
-                <div className="settings-section">
-                  <div className="settings-section-title">Account</div>
-                  <div className="settings-row" onClick={() => setEditOpen(true)}>
-                    <div className="settings-row-icon" style={{ background: 'rgba(50,111,202,0.1)' }}>👤</div>
-                    <div className="settings-row-info">
-                      <div className="settings-row-title">Edit Profile</div>
-                      <div className="settings-row-sub">Update your name and payment QR code</div>
-                    </div>
-                    <div className="settings-row-action">›</div>
-                  </div>
-                  <div className="settings-row" onClick={() => setChangePwOpen(true)}>
-                    <div className="settings-row-icon" style={{ background: 'rgba(50,111,202,0.1)' }}>🔒</div>
-                    <div className="settings-row-info">
-                      <div className="settings-row-title">Change Password</div>
-                      <div className="settings-row-sub">Keep your account secure</div>
-                    </div>
-                    <div className="settings-row-action">›</div>
-                  </div>
-                </div>
-
-                <div className="settings-section">
-                  <div className="settings-section-title">Danger Zone</div>
-                  <div className="settings-row" onClick={handleLogout}>
-                    <div className="settings-row-icon" style={{ background: 'rgba(224,80,74,0.1)' }}>🚪</div>
-                    <div className="settings-row-info">
-                      <div className="settings-row-title">Log Out</div>
-                      <div className="settings-row-sub">Sign out of your account</div>
-                    </div>
-                    <div className="settings-row-action">›</div>
-                  </div>
-                </div>
-              </div>
-            )}
+            ) : null}
           </>
         )}
       </main>
-
-      {/* ===== FULL-SCREEN PANEL STACK (Product / Messages / Cart) ===== */}
-      {panelStack.map((panel, i) => {
-        if (panel.type === 'product') {
-          return (
-            <ProductPanel
-              key={i}
-              productID={panel.productID}
-              token={token}
-              myUserID={myID}
-              onBack={popPanel}
-              onPush={pushPanel}
-              onToast={showToast}
-              onOpenPayment={setPaymentProduct}
-              cart={cart}
-              headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); navigate('/dashboard'); } }}
-            />
-          );
-        }
-        if (panel.type === 'messages') {
-          return (
-            <MessagesPanel
-              key={i}
-              initialUserID={panel.userID}
-              initialUserName={panel.userName}
-              token={token}
-              myUserID={myID}
-              onBack={popPanel}
-              headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); navigate('/dashboard'); } }}
-            />
-          );
-        }
-        if (panel.type === 'cart') {
-          return (
-            <CartPanel
-              key={i}
-              cart={cart}
-              onBack={popPanel}
-              onOpenProduct={(id) => pushPanel({ type: 'product', productID: id })}
-              onOpenPayment={setPaymentProduct}
-              onToast={showToast}
-              headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); navigate('/dashboard'); } }}
-            />
-          );
-        }
-        return null;
-      })}
-
-      {/* ===== SELL (full page) ===== */}
-      <SellModal
-        open={sellModalOpen}
-        onClose={() => setSellModalOpen(false)}
-        categories={categories}
-        token={token}
-        editData={sellEditData}
-        onSaved={loadProfileData}
-        headerProps={{ ...headerProps, onBrandClick: () => { setPanelStack([]); setSellModalOpen(false); navigate('/dashboard'); } }}
-        onToast={showToast}
-      />
-
-      <PaymentModal
-        product={paymentProduct}
-        token={token}
-        onClose={() => setPaymentProduct(null)}
-        onSuccess={() => { loadProfileData(); if (paymentProduct) cart.removeFromCart(paymentProduct.productID); }}
-        onToast={showToast}
-      />
 
       <EditProfileModal
         open={editOpen}

@@ -5,7 +5,7 @@ export default function CartPanel({ cart, onBack, onOpenProduct, onOpenPayment, 
 
   return (
     <div className="fullpanel-overlay">
-      <AppHeader {...headerProps} onBack={onBack} title={`🛒 Cart${items.length > 0 ? ` (${items.length})` : ''}`} />
+      <AppHeader {...headerProps} active="cart" onBack={onBack} title={`🛒 Cart${items.length > 0 ? ` (${items.length})` : ''}`} />
 
       <div className="fullpanel-body">
         <div className="cart-panel-inner">

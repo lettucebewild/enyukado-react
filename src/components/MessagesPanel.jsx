@@ -97,6 +97,9 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
       .then((u) => {
         const sub = [u.Course, u.Year, u.CampusArea].filter(Boolean).join(' · ');
         setActiveSub(sub || 'NU Manila Student');
+        // opened straight from the URL (refresh / shared link): no name was passed in
+        const full = [u.FirstName, u.LastName].filter(Boolean).join(' ');
+        if (full) setActiveName((n) => n || full);
       })
       .catch(() => {});
   }, [activeID]);
@@ -106,6 +109,8 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
     setActiveName(name);
     setSearchOpen(false);
     setSearchQuery('');
+    // keep the address bar in step with the open conversation (no extra history entry)
+    navigate(`/messages/${userID}`, { replace: true, state: { userName: name } });
   }
 
   function handleSearchInput(q) {
@@ -177,7 +182,7 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
 
   return (
     <div className="fullpanel-overlay">
-      <AppHeader {...headerProps} onBack={onBack} title="💬 Messages" />
+      <AppHeader {...headerProps} active="messages" onBack={onBack} title="💬 Messages" />
 
       <div className="fullpanel-body" style={{ display: 'flex', minHeight: 0 }}>
         {/* Conversation list */}

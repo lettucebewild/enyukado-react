@@ -25,6 +25,7 @@ export default function ProductPanel({
   onPush,
   onToast,
   onOpenPayment,
+  onOpenCategory,
   cart,
   headerProps,
 }) {
@@ -35,10 +36,12 @@ export default function ProductPanel({
   const [heartPop, setHeartPop] = useState(false);
   const [rating, setRating] = useState('—');
   const [loading, setLoading] = useState(true);
+  const [descOpen, setDescOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setDescOpen(false);
     getProduct(productID)
       .then(async (p) => {
         if (cancelled) return;
@@ -70,7 +73,7 @@ export default function ProductPanel({
   if (loading || !product) {
     return (
       <div className="fullpanel-overlay">
-        <AppHeader {...headerProps} onBack={onBack} title="Loading…" />
+        <AppHeader {...headerProps} within="browse" onBack={onBack} crumbs={[{ label: 'Browse' }, { label: 'Loading…' }]} />
       </div>
     );
   }
@@ -88,6 +91,16 @@ export default function ProductPanel({
   const postedAgo = product.DatePosted ? timeAgo(new Date(product.DatePosted)) : 'Recently';
   const outOfStock = product.Quantity <= 0 || product.Status === 'Sold';
   const inCart = cart?.isInCart(product.ProductID);
+
+  const categoryName = product.CategoryName || 'Others';
+  const crumbs = [
+    { label: 'Browse' },
+    {
+      label: categoryName,
+      onClick: onOpenCategory && product.CategoryID != null ? () => onOpenCategory(product.CategoryID) : undefined,
+    },
+    { label: product.ProductName },
+  ];
 
   const paymentPayload = {
     productID: product.ProductID,
@@ -123,80 +136,145 @@ export default function ProductPanel({
     else navigate(`/profile?id=${product.UserID}`);
   }
 
+  const description = (product.Description || '').trim();
+  const descLong = description.length > 320 || description.split('\n').length > 6;
+  const priceText = `₱${parseFloat(product.Price).toLocaleString()}`;
+
   return (
     <div className="fullpanel-overlay">
-      <AppHeader {...headerProps} onBack={onBack} title="Product" />
+      <AppHeader {...headerProps} within="browse" onBack={onBack} crumbs={crumbs} />
 
       <div className="fullpanel-body">
-        <div className="product-panel-inner">
-          <div className="product-panel-img-col">
-            <div className="product-img-main-wrap">
-              {activeImg ? <img src={activeImg} alt={product.ProductName} /> : <div style={{ fontSize: '5rem' }}>📦</div>}
-            </div>
-            {images.length > 1 && (
-              <div className="product-img-thumbs">
-                {images.map((img, i) => (
-                  <img
-                    key={i}
-                    src={img.ImageURL}
-                    className={`product-img-thumb${img.ImageURL === activeImg ? ' active' : ''}`}
-                    onClick={() => setActiveImg(img.ImageURL)}
-                    alt=""
-                  />
-                ))}
+        <div className="pp-wrap">
+          {/* ---------- Top: photos on the left, the essentials on the right ---------- */}
+          <div className={`pp-top${images.length > 1 ? ' has-thumbs' : ''}`}>
+            {/* ---------- Gallery ---------- */}
+            <div className="pp-gallery">
+              <div className="pp-main">
+                {activeImg ? <img src={activeImg} alt={product.ProductName} /> : <div className="pp-main-empty">📦</div>}
+                {outOfStock && <span className="pp-sold">Sold out</span>}
               </div>
-            )}
-          </div>
-
-          <div className="product-panel-info-col">
-            <div className="product-title-row">
-              <div className="item-modal-title">{product.ProductName}</div>
-              {token && (
-                <button
-                  className={`big-heart-btn${saved ? ' liked' : ''}${heartPop ? ' pop' : ''}`}
-                  title="Save to wishlist"
-                  onClick={toggleSave}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M6 3h12a1 1 0 011 1v17l-7-4.5L5 21V4a1 1 0 011-1z"
-                      fill={saved ? 'currentColor' : 'none'}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+              {images.length > 1 && (
+                <div className="pp-thumbs">
+                  {images.map((img, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`pp-thumb${img.ImageURL === activeImg ? ' active' : ''}`}
+                      onClick={() => setActiveImg(img.ImageURL)}
+                    >
+                      <img src={img.ImageURL} alt="" />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            <div className="item-modal-price">₱{parseFloat(product.Price).toLocaleString()}</div>
 
-            <div className="item-meta-tags">
-              <div className="meta-tag">🏷️ {product.CategoryName || 'Others'}</div>
-              <div className="meta-tag"><span className={`dot ${condColor}`}></span> {product.ProductCondition}</div>
-              {product.Quantity > 1 && <div className="meta-tag">📦 {product.Quantity} units</div>}
+            <div className="pp-info">
+              <div className="pp-card">
+                <div className="pp-tags">
+                  <span className="pp-tag cat">{product.CategoryName || 'Others'}</span>
+                  <span className={`pp-tag cond ${condColor}`}>{product.ProductCondition}</span>
+                </div>
+
+                <div className="pp-title-row">
+                  <h1 className="pp-title">{product.ProductName}</h1>
+                  {token && (
+                    <button
+                      type="button"
+                      className={`pp-save${saved ? ' saved' : ''}${heartPop ? ' pop' : ''}`}
+                      title={saved ? 'Remove from saved' : 'Save for later'}
+                      onClick={toggleSave}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M6 3h12a1 1 0 011 1v17l-7-4.5L5 21V4a1 1 0 011-1z"
+                          fill={saved ? 'currentColor' : 'none'}
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span>{saved ? 'Saved' : 'Save'}</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="pp-price-row">
+                  <div className="pp-price">{priceText}</div>
+                  <span className="pp-posted">Posted {postedAgo}</span>
+                </div>
+
+                <div className="pp-facts">
+                  <div className="pp-fact">
+                    <span className="pp-fact-label">Available</span>
+                    <span className="pp-fact-value">{outOfStock ? 'Sold' : `${product.Quantity} ${product.Quantity === 1 ? 'unit' : 'units'}`}</span>
+                  </div>
+                </div>
+
+                {!isMine ? (
+                  <div className="pp-actions">
+                    <button
+                      className="btn-buy"
+                      disabled={outOfStock}
+                      onClick={() => onOpenPayment(paymentPayload)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>
+                      {outOfStock ? 'Out of Stock' : 'Buy Now'}
+                    </button>
+                    <button
+                      className={`btn-add-cart${inCart ? ' added' : ''}`}
+                      disabled={outOfStock}
+                      onClick={() => {
+                        if (inCart) return;
+                        cart?.addToCart(paymentPayload);
+                        onToast?.('Added to cart!');
+                      }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" /></svg>
+                      {inCart ? 'In Cart' : 'Add to Cart'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pp-own-note">This is your listing.</div>
+                )}
+              </div>
             </div>
+          </div>
 
-            <div className="item-modal-desc-label">Description</div>
-            <div className="item-modal-desc">{product.Description || 'No description provided.'}</div>
-            <div className="item-modal-posted">🕐 Posted {postedAgo}</div>
-
-            <div className="seller-card" onClick={goToSellerProfile}>
-              <div className="seller-avatar">{sellerInitials}</div>
-              <div className="seller-info">
-                <div className="seller-name">{sellerName}</div>
-                <div className="seller-sub">⭐ {rating}</div>
+          {/* ---------- Below: the long stuff, full width ---------- */}
+          <div className="pp-below">
+            <div className="pp-seller" onClick={goToSellerProfile}>
+              <div className="pp-seller-avatar">{sellerInitials}</div>
+              <div className="pp-seller-info">
+                <span className="pp-seller-label">Sold by</span>
+                <span className="pp-seller-name">{sellerName}</span>
+                <span className="pp-seller-rating">⭐ {rating}</span>
               </div>
               {!isMine && (
                 <button
-                  className="seller-msg-btn"
-                  title="Message seller"
+                  type="button"
+                  className="pp-seller-msg"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPush({ type: 'messages', userID: product.UserID, userName: sellerName });
                   }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                  Message
+                </button>
+              )}
+            </div>
+
+            <div className="pp-about">
+              <h2 className="pp-label">About this item</h2>
+              {/* white-space: pre-wrap (see CSS) keeps the seller's line breaks */}
+              <p className={`pp-desc${descLong && !descOpen ? ' clamped' : ''}`}>
+                {description || 'No description provided.'}
+              </p>
+              {descLong && (
+                <button type="button" className="pp-more" onClick={() => setDescOpen((o) => !o)}>
+                  {descOpen ? 'Show less' : 'Read more'}
                 </button>
               )}
             </div>
@@ -204,39 +282,6 @@ export default function ProductPanel({
         </div>
       </div>
 
-      {/* Pinned to the very bottom of the panel (outside the scrollable
-          area above) so Buy Now / Add to Cart are always reachable
-          without scrolling past the description. Messaging the seller
-          lives on the seller card above instead. */}
-      {!isMine && (
-        <div className="product-actions-bar">
-          <div className="product-actions-bar-inner">
-            <div className="product-actions-spacer" aria-hidden="true" />
-            <div className="item-modal-actions">
-              <button
-                className="btn-buy"
-                disabled={outOfStock}
-                onClick={() => onOpenPayment(paymentPayload)}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>
-                {outOfStock ? 'Out of Stock' : 'Buy Now'}
-              </button>
-              <button
-                className={`btn-add-cart${inCart ? ' added' : ''}`}
-                disabled={outOfStock}
-                onClick={() => {
-                  if (inCart) return;
-                  cart?.addToCart(paymentPayload);
-                  onToast?.('Added to cart!');
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" /></svg>
-                {inCart ? 'In Cart' : 'Add to Cart'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
