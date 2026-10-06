@@ -316,7 +316,7 @@ router.delete('/:id', auth, async (req, res) => {
 
     try {
         const product = productId === null ? null
-            : await Product.findOne({ ProductID: productId }, { UserID: 1, images: 1 }).lean();
+            : await Product.findOne({ ProductID: productId }, { UserID: 1, ImageURL: 1, images: 1 }).lean();
 
         if (!product) {
             return res.status(404).json({ message: 'Product not found.' });
@@ -332,6 +332,7 @@ router.delete('/:id', auth, async (req, res) => {
         }
 
         (product.images || []).forEach(img => deleteImageFile(img.ImageURL));
+        deleteImageFile(product.ImageURL);
 
         await Product.deleteOne({ ProductID: productId });
         await SavedItem.deleteMany({ ProductID: productId });

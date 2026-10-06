@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function ProfileMenu({ initials, onProfile, onChangePassword, onLogout }) {
+export default function ProfileMenu({ initials, profileImage, onProfile, onChangePassword, onLogout }) {
   const [open, setOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -15,7 +16,7 @@ export default function ProfileMenu({ initials, onProfile, onChangePassword, onL
   return (
     <div className="avatar-menu-wrap" ref={ref}>
       <button className="avatar-btn" title="My account" onClick={() => setOpen((o) => !o)}>
-        {initials}
+        {profileImage && !imageFailed ? <img src={profileImage} alt="" onError={() => setImageFailed(true)} /> : initials}
       </button>
       <div className={`avatar-dropdown${open ? ' open' : ''}`}>
         <button className="avatar-dropdown-item" onClick={() => { setOpen(false); onProfile(); }}>

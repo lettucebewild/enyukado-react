@@ -72,3 +72,23 @@
   .al-left { padding: 28px 20px 36px; }
   .al-form { padding: 24px 20px; }
 }
+
+.al-left { background: #173d6b; border-right: 5px solid #d8b04b; }
+.al-pill { background: rgba(255,255,255,0.08); border-color: rgba(225,188,83,0.4); color: #f2d987; border-radius: 6px; }
+.al-pill i { background: #e0b84c; }
+.al-feature-icon { background: rgba(225,188,83,0.12); border-color: rgba(225,188,83,0.4); }
+.al-right { background: #edf2f7; border-left-color: #dce4ed; }
+.al-form { background: #fff; border-color: #dce4ed; border-radius: 8px; color: #192d46; box-shadow: 0 12px 30px rgba(23,61,107,0.1); }
+.al-form h2 { color: #173d6b; letter-spacing: 0; }
+.al-sub { color: #6d7f94; }
+.al-form hr { border-top-color: #e2e8ef; }
+.al-form label { color: #52647b; }
+.al-field > svg { color: #75869a; }
+.al-field:focus-within > svg { color: #1e4e88; }
+.al-field input { border-color: #d5e0eb; border-radius: 7px; background: #f7f9fc; color: #192d46; }
+.al-field input::placeholder { color: #8a97a8; }
+.al-field input:focus { border-color: #c49a35; box-shadow: 0 0 0 3px rgba(196,154,53,0.16); }
+.al-submit { border-radius: 7px; background: #d8b04b; color: #183657; box-shadow: none; }
+.al-submit:hover:not(:disabled) { background: #c89b32; }
+.al-eye { color: #708196; }
+.al-eye:focus-visible, .al-submit:focus-visible { outline-color: #c7982d; }

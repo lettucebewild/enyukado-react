@@ -20,12 +20,12 @@ export default function App() {
           that sit on top of it. Each view has its own URL, so the address bar,
           refresh, the back button and shared links all work. */}
       <Route element={<Dashboard />}>
-        <Route path="/dashboard" />
-        <Route path="/product/:productId" />
-        <Route path="/messages" />
-        <Route path="/messages/:userId" />
-        <Route path="/cart" />
-        <Route path="/sell" />
+        <Route path="/dashboard" element={<></>} />
+        <Route path="/product/:productId" element={<></>} />
+        <Route path="/messages" element={<></>} />
+        <Route path="/messages/:userId" element={<></>} />
+        <Route path="/cart" element={<></>} />
+        <Route path="/sell" element={<></>} />
       </Route>
       <Route path="/profile" element={<Profile />} />
       <Route path="/admin" element={<AdminDashboard />} />

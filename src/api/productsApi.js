@@ -24,3 +24,7 @@ export function createProduct(formData, token) {
 export function updateProduct(id, formData, token) {
   return apiClient.putForm(`/products/${id}`, formData, { token });
 }
+
+export function deleteProduct(id, token) {
+  return apiClient.del(`/products/${id}`, { token });
+}

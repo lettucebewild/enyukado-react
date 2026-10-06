@@ -10,6 +10,8 @@ function readStoredUser() {
     firstName: localStorage.getItem('userName'),
     lastName: localStorage.getItem('userLastName'),
     email: localStorage.getItem('userEmail'),
+    profileImage: localStorage.getItem('userProfileImage'),
+    isFirstLogin: localStorage.getItem('userFirstLogin') === 'true',
     id: localStorage.getItem('userID'),
   };
 }
@@ -23,6 +25,9 @@ export function AuthProvider({ children }) {
     localStorage.setItem('userLastName', data.user.lastName);
     localStorage.setItem('userEmail', data.user.email);
     localStorage.setItem('userID', data.user.id);
+    localStorage.setItem('userFirstLogin', String(data.user.isFirstLogin === true));
+    if (data.user.profileImage) localStorage.setItem('userProfileImage', data.user.profileImage);
+    else localStorage.removeItem('userProfileImage');
     setUser({ token: data.token, ...data.user });
   }, []);
 
@@ -31,12 +36,16 @@ export function AuthProvider({ children }) {
       if (!u) return u;
       if (patch.firstName !== undefined) localStorage.setItem('userName', patch.firstName);
       if (patch.lastName !== undefined) localStorage.setItem('userLastName', patch.lastName);
+      if (patch.profileImage !== undefined) {
+        if (patch.profileImage) localStorage.setItem('userProfileImage', patch.profileImage);
+        else localStorage.removeItem('userProfileImage');
+      }
       return { ...u, ...patch };
     });
   }, []);
 
   const signOut = useCallback(() => {
-    ['userToken', 'userName', 'userLastName', 'userEmail', 'userID'].forEach((k) =>
+    ['userToken', 'userName', 'userLastName', 'userEmail', 'userProfileImage', 'userID', 'userFirstLogin'].forEach((k) =>
       localStorage.removeItem(k)
     );
     setUser(null);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProduct } from '../api/productsApi.js';
+import { deleteProduct, getProduct } from '../api/productsApi.js';
 import { saveItem, unsaveItem, checkSaved } from '../api/savedApi.js';
 import { getReviewsForUser } from '../api/reviewsApi.js';
 import AppHeader from './AppHeader.jsx';
@@ -26,6 +26,7 @@ export default function ProductPanel({
   onToast,
   onOpenPayment,
   onOpenCategory,
+  onDeleted,
   cart,
   headerProps,
 }) {
@@ -36,11 +37,13 @@ export default function ProductPanel({
   const [heartPop, setHeartPop] = useState(false);
   const [rating, setRating] = useState('—');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [descOpen, setDescOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError('');
     setDescOpen(false);
     getProduct(productID)
       .then(async (p) => {
@@ -63,17 +66,42 @@ export default function ProductPanel({
           /* ignore */
         }
       })
-      .catch(() => onToast?.('Failed to load product.', 'error'))
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(err.status === 404 ? 'This listing is no longer available.' : 'Could not load this listing. Please try again.');
+        onToast?.(err.message || 'Failed to load product.', 'error');
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
   }, [productID, token]);
 
-  if (loading || !product) {
+  if (loading) {
     return (
       <div className="fullpanel-overlay">
-        <AppHeader {...headerProps} within="browse" onBack={onBack} crumbs={[{ label: 'Browse' }, { label: 'Loading…' }]} />
+        <AppHeader {...headerProps} within="browse" onBack={onBack} crumbs={[{ label: 'Browse' }, { label: 'Product' }]} />
+        <div className="fullpanel-body pp-loading-skeleton" aria-label="Loading product">
+          <div className="skeleton-shimmer pp-loading-image" />
+          <div className="pp-loading-info">
+            <div className="skeleton-shimmer pp-loading-line short" />
+            <div className="skeleton-shimmer pp-loading-line title" />
+            <div className="skeleton-shimmer pp-loading-line" />
+            <div className="skeleton-shimmer pp-loading-line" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !product) {
+    return (
+      <div className="fullpanel-overlay">
+        <AppHeader {...headerProps} within="browse" onBack={onBack} crumbs={[{ label: 'Browse' }, { label: 'Product' }]} />
+        <div className="fullpanel-body pp-not-found">
+          <h1>{loadError || 'This listing is no longer available.'}</h1>
+          <button type="button" onClick={onBack}>Back to browsing</button>
+        </div>
       </div>
     );
   }
@@ -134,6 +162,33 @@ export default function ProductPanel({
   function goToSellerProfile() {
     if (String(product.UserID) === String(myUserID)) navigate('/profile');
     else navigate(`/profile?id=${product.UserID}`);
+  }
+
+  async function handleDeleteListing() {
+    if (!window.confirm(`Delete "${product.ProductName}"? This cannot be undone.`)) return;
+    try {
+      await deleteProduct(product.ProductID, token);
+      onToast?.('Listing deleted.');
+      onDeleted?.();
+    } catch (err) {
+      onToast?.(err.message || 'Failed to delete listing.', 'error');
+    }
+  }
+
+  function editListing() {
+    navigate('/sell', {
+      state: {
+        editData: {
+          productID: product.ProductID,
+          name: product.ProductName,
+          price: product.Price,
+          categoryID: product.CategoryID,
+          condition: product.ProductCondition,
+          description: product.Description || '',
+          quantity: product.Quantity,
+        },
+      },
+    });
   }
 
   const description = (product.Description || '').trim();
@@ -236,7 +291,13 @@ export default function ProductPanel({
                     </button>
                   </div>
                 ) : (
-                  <div className="pp-own-note">This is your listing.</div>
+                  <div className="pp-own-actions">
+                    <span className="pp-own-note">This is your listing.</span>
+                    <div className="pp-owner-buttons">
+                      <button type="button" className="pp-owner-edit" onClick={editListing}>Edit</button>
+                      <button type="button" className="pp-owner-delete" onClick={handleDeleteListing}>Delete</button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

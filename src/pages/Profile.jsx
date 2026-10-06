@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../hooks/useToast.js';
@@ -9,9 +9,10 @@ import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
 import EditProfileModal from '../components/EditProfileModal.jsx';
 import { getUser } from '../api/usersApi.js';
 import { getReviewsForUser } from '../api/reviewsApi.js';
-import { getMyListings, getProducts } from '../api/productsApi.js';
+import { deleteProduct, getMyListings, getProducts } from '../api/productsApi.js';
 import { getMyPurchases } from '../api/transactionsApi.js';
-import { getSavedItems } from '../api/savedApi.js';
+import { getSavedItems, unsaveItem } from '../api/savedApi.js';
+import { uploadProfilePhoto } from '../api/usersApi.js';
 import { getUnreadCount } from '../api/messagesApi.js';
 import '../pages/Dashboard.css';
 import './Profile.css';
@@ -35,6 +36,43 @@ function StarLine({ value, size = '1.1rem' }) {
       {'★★★★★'.slice(0, rounded)}
       {'☆☆☆☆☆'.slice(0, 5 - rounded)}
     </span>
+  );
+}
+
+function ProfileItemImage({ src, alt, className }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <div className={`${className} profile-image-placeholder`} aria-label={alt}>📦</div>;
+  return <img className={className} src={src} alt={alt} onError={() => setFailed(true)} />;
+}
+
+function ProfileGridSkeleton() {
+  return (
+    <div className="profile-grid" aria-label="Loading items">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div className="profile-skeleton" key={i} aria-hidden="true">
+          <div className="skeleton-shimmer profile-skeleton-image" />
+          <div className="skeleton-shimmer profile-skeleton-line" />
+          <div className="skeleton-shimmer profile-skeleton-line short" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProfilePurchasesSkeleton() {
+  return (
+    <div className="profile-list" aria-label="Loading purchases">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div className="profile-list-row profile-purchase-skeleton" key={i} aria-hidden="true">
+          <div className="skeleton-shimmer profile-purchase-skeleton-image" />
+          <div className="profile-purchase-skeleton-info">
+            <div className="skeleton-shimmer profile-purchase-skeleton-line title" />
+            <div className="skeleton-shimmer profile-purchase-skeleton-line" />
+          </div>
+          <div className="skeleton-shimmer profile-purchase-skeleton-price" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -77,6 +115,8 @@ export default function Profile() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [changePwOpen, setChangePwOpen] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const avatarInputRef = useRef(null);
 
   // ---- header state: unread count for the Messages badge. Messages, Cart and
   // Sell are real pages (/messages, /cart, /sell) rendered by the Dashboard
@@ -256,6 +296,56 @@ export default function Profile() {
     }
   }
 
+  async function handleProfilePhotoChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const result = await uploadProfilePhoto(file, token);
+      setProfile((current) => ({ ...current, ProfileImage: result.profileImage }));
+      updateUser({ profileImage: result.profileImage });
+      showToast('Profile photo updated.');
+    } catch (err) {
+      showToast(err.message || 'Failed to upload profile photo.', 'error');
+    } finally {
+      setPhotoUploading(false);
+      event.target.value = '';
+    }
+  }
+
+  async function handleDeleteListing(product) {
+    if (!window.confirm(`Delete "${product.ProductName}"? This cannot be undone.`)) return;
+    try {
+      await deleteProduct(product.ProductID, token);
+      setListings((current) => current.filter((item) => item.ProductID !== product.ProductID));
+      showToast('Listing deleted.');
+    } catch (err) {
+      showToast(err.message || 'Failed to delete listing.', 'error');
+    }
+  }
+
+  async function handleUnsave(productID) {
+    try {
+      await unsaveItem(productID, token);
+      setSaved((current) => current.filter((item) => item.ProductID !== productID));
+      showToast('Removed from saved items.');
+    } catch (err) {
+      showToast(err.message || 'Failed to remove saved item.', 'error');
+    }
+  }
+
+  function editListing(product) {
+    openSellModal({
+      productID: product.ProductID,
+      name: product.ProductName,
+      price: product.Price,
+      categoryID: product.CategoryID,
+      condition: product.ProductCondition,
+      description: product.Description || '',
+      quantity: product.Quantity,
+    });
+  }
+
   // Initials for the logged-in user's own avatar menu (top right) — distinct
   // from `initials`, which is the *viewed* profile's initials shown in the
   // big banner and can belong to someone else entirely.
@@ -270,6 +360,7 @@ export default function Profile() {
     onOpenMessages: () => openMessages(null, null),
     onOpenSell: () => openSellModal(null),
     initials: myInitials,
+    profileImage: user?.profileImage,
     onProfile: () => navigate('/profile'),
     onChangePassword: () => setChangePwOpen(true),
     onLogout: handleLogout,
@@ -282,15 +373,54 @@ export default function Profile() {
 
       <main className="profile-main">
         {!profile ? (
-          <div className="profile-loading">Loading profile…</div>
+          <div className="profile-loading" aria-label="Loading profile">
+            <div className="skeleton-shimmer profile-loading-banner" />
+            <div className="skeleton-shimmer profile-loading-title" />
+            <div className="skeleton-shimmer profile-loading-line" />
+            <ProfileGridSkeleton />
+          </div>
         ) : (
           <>
             {/* ===== PROFILE HEADER ===== */}
             <div className="profile-header">
-              <div className="profile-banner" />
+              <div className="profile-banner">
+                <span className="profile-banner-label">CAMPUS MARKETPLACE</span>
+                <span className="profile-banner-stamp">STUDENT PROFILE</span>
+              </div>
               <div className="profile-body">
-                <div className="profile-avatar-row">
-                  <div className="profile-avatar">{initials}</div>
+                <div className="profile-identity">
+                  <div className="profile-avatar">
+                    {profile.ProfileImage ? <img src={profile.ProfileImage} alt={`${profile.FirstName}'s profile`} onError={() => setProfile((current) => ({ ...current, ProfileImage: null }))} /> : initials}
+                    {isOwn && (
+                      <>
+                        <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProfilePhotoChange} hidden />
+                        <button
+                          type="button"
+                          className="profile-photo-trigger"
+                          title="Upload profile photo"
+                          aria-label="Upload profile photo"
+                          disabled={photoUploading}
+                          onClick={() => avatarInputRef.current?.click()}
+                        >
+                          {photoUploading ? 'Uploading…' : 'Change photo'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="profile-identity-copy">
+                    <div className="profile-kicker">
+                      <span className="profile-kicker-mark" />
+                      {isOwn ? 'YOUR CAMPUS PROFILE' : 'CAMPUS MEMBER'}
+                    </div>
+                    <h1 className="profile-name">{profile.FirstName} {profile.LastName}</h1>
+                    {memberSince && <div className="profile-handle"><span className="profile-member-dot" />Member since {memberSince}</div>}
+                    {profile.Bio && <div className="profile-bio">{profile.Bio}</div>}
+                    <div className="profile-tags">
+                      {tags.map((t, i) => (
+                        <span className="profile-tag" key={i}>{t.icon} {t.label}</span>
+                      ))}
+                    </div>
+                  </div>
                   {isOwn && (
                     <div className="profile-avatar-actions">
                       <button className="btn-edit-profile" onClick={() => setEditOpen(true)}>
@@ -299,14 +429,6 @@ export default function Profile() {
                       </button>
                     </div>
                   )}
-                </div>
-                <div className="profile-name">{profile.FirstName} {profile.LastName}</div>
-                {memberSince && <div className="profile-handle">Member since {memberSince}</div>}
-                {profile.Bio && <div className="profile-bio">{profile.Bio}</div>}
-                <div className="profile-tags">
-                  {tags.map((t, i) => (
-                    <span className="profile-tag" key={i}>{t.icon} {t.label}</span>
-                  ))}
                 </div>
                 <div className="profile-stats">
                   <div className="stat-item"><div className="stat-value">{listings.length}</div><div className="stat-label">Listings</div></div>
@@ -317,145 +439,170 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* ===== RATING CARD ===== */}
-            <div className="rating-card">
-              <div className="rating-big">
-                <div className="rating-big-num">{rating === '—' ? '0.0' : rating}</div>
-                <StarLine value={rating === '—' ? 0 : rating} />
-                <div className="rating-count">{reviewCount} review{reviewCount === 1 ? '' : 's'}</div>
-              </div>
-              <div className="rating-bars">
-                {ratingBars.map((b) => (
-                  <div className="rating-bar-row" key={b.star}>
-                    <span>{b.star}</span>
-                    <div className="rating-bar-bg"><div className="rating-bar-fill" style={{ width: `${b.pct}%` }} /></div>
-                    <span>{b.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ===== TABS ===== */}
-            <div className="tabs">
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  className={`tab${tab === t.id ? ' active' : ''}`}
-                  onClick={() => setTab(t.id)}
-                >
-                  {t.icon} {t.label}
-                  {t.count !== null && <span className="tab-count">{t.count}</span>}
-                </button>
-              ))}
-            </div>
-
-            {loading ? (
-              <div className="profile-loading">Loading…</div>
-            ) : tab === 'listings' ? (
-              listings.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">📦</div>
-                  <h4>No listings yet</h4>
-                  <p>{isOwn ? 'Post something you no longer need!' : 'No listings from this seller yet.'}</p>
-                </div>
-              ) : (
-                <div className="profile-grid">
-                  {listings.map((p) => {
-                    const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
-                    return (
-                      <div className="profile-card" key={p.ProductID}>
-                        <div className="profile-card-img">
-                          {imgURL ? <img src={imgURL} alt={p.ProductName} /> : '📦'}
-                          {p.Status && <span className={`profile-status-badge ${p.Status}`}>{p.Status}</span>}
-                        </div>
-                        <div className="profile-card-body">
-                          <h4>{p.ProductName}</h4>
-                          <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            ) : tab === 'purchases' ? (
-              purchases.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">🛍️</div>
-                  <h4>No purchases yet</h4>
-                  <p>Items you buy will appear here.</p>
-                </div>
-              ) : (
-                <div className="profile-list">
-                  {purchases.map((t) => (
-                    <div className="profile-list-row" key={t.TransactionID}>
-                      <img className="profile-list-row-img" src={t.ImageURL || undefined} alt="" />
-                      <div className="profile-list-row-info">
-                        <div className="profile-list-row-name">{t.ProductName}</div>
-                        <div className="profile-list-row-sub">
-                          {t.Status} · {timeAgo(new Date(t.TransactionDate))}
-                        </div>
-                      </div>
-                      <div className="profile-list-row-price">₱{parseFloat(t.Price).toLocaleString()}</div>
-                    </div>
+            <div className="profile-workspace">
+              <section className="profile-content" aria-label="Profile activity">
+                {/* ===== TABS ===== */}
+                <div className="tabs">
+                  {tabs.map((t) => (
+                    <button
+                      key={t.id}
+                      className={`tab${tab === t.id ? ' active' : ''}`}
+                      onClick={() => setTab(t.id)}
+                    >
+                      {t.icon} {t.label}
+                      {t.count !== null && <span className="tab-count">{t.count}</span>}
+                    </button>
                   ))}
                 </div>
-              )
-            ) : tab === 'saved' ? (
-              saved.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">🤍</div>
-                  <h4>Nothing saved yet</h4>
-                  <p>Heart items on the marketplace to save them here.</p>
-                </div>
-              ) : (
-                <div className="profile-grid">
-                  {saved.map((p) => {
-                    const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
-                    return (
-                      <div className="profile-card" key={p.ProductID}>
-                        <div className="profile-card-img">
-                          {imgURL ? <img src={imgURL} alt={p.ProductName} /> : '📦'}
-                        </div>
-                        <div className="profile-card-body">
-                          <h4>{p.ProductName}</h4>
-                          <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            ) : tab === 'reviews' ? (
-              reviews.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">⭐</div>
-                  <h4>No reviews yet</h4>
-                  <p>Reviews from buyers will appear here.</p>
-                </div>
-              ) : (
-                <div className="reviews-list">
-                  {reviews.map((r) => {
-                    const rInitials = r.ReviewerFirstName && r.ReviewerLastName
-                      ? (r.ReviewerFirstName[0] + r.ReviewerLastName[0]).toUpperCase()
-                      : '?';
-                    return (
-                      <div className="review-card" key={r.ReviewID}>
-                        <div className="review-header">
-                          <div className="reviewer-avatar">{rInitials}</div>
-                          <div>
-                            <div className="reviewer-name">{r.ReviewerFirstName} {r.ReviewerLastName}</div>
-                            <StarLine value={r.Rating} size="0.85rem" />
+
+                {loading ? (
+                  tab === 'purchases' ? <ProfilePurchasesSkeleton /> : <ProfileGridSkeleton />
+                ) : tab === 'listings' ? (
+                  listings.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">📦</div>
+                      <h4>No listings yet</h4>
+                      <p>{isOwn ? 'Post something you no longer need!' : 'No listings from this seller yet.'}</p>
+                      {isOwn && <button className="empty-state-action" onClick={() => openSellModal(null)}>Post your first listing</button>}
+                    </div>
+                  ) : (
+                    <div className="profile-grid">
+                      {listings.map((p) => {
+                        const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
+                        return (
+                          <article className={`profile-card${p.Status === 'Sold' ? ' sold' : ''}`} key={p.ProductID}>
+                            <Link className="profile-card-open" to={`/product/${p.ProductID}`}>
+                              <div className="profile-card-img">
+                                {imgURL ? <img src={imgURL} alt={p.ProductName} /> : '📦'}
+                                {p.Status && <span className={`profile-status-badge ${p.Status}`}>{p.Status}</span>}
+                              </div>
+                              <div className="profile-card-body">
+                                <h4>{p.ProductName}</h4>
+                                <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
+                              </div>
+                            </Link>
+                            {isOwn && <div className="profile-card-actions">
+                              <button type="button" onClick={() => editListing(p)}>Edit</button>
+                              <button type="button" className="delete" onClick={() => handleDeleteListing(p)}>Delete</button>
+                            </div>}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : tab === 'purchases' ? (
+                  purchases.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">🛍️</div>
+                      <h4>No purchases yet</h4>
+                      <p>Items you buy will appear here.</p>
+                      <button className="empty-state-action" onClick={() => navigate('/dashboard')}>Browse marketplace</button>
+                    </div>
+                  ) : (
+                    <div className="profile-list">
+                      {purchases.map((t) => (
+                        <div className="profile-list-row" key={t.TransactionID} role="button" tabIndex={0} onClick={() => t.ProductID && navigate(`/product/${t.ProductID}`)} onKeyDown={(e) => e.key === 'Enter' && t.ProductID && navigate(`/product/${t.ProductID}`)}>
+                          <ProfileItemImage className="profile-list-row-img" src={t.ImageURL} alt={t.ProductName || 'Purchased item'} />
+                          <div className="profile-list-row-info">
+                            <div className="profile-list-row-name">{t.ProductName}</div>
+                            <div className="profile-list-row-sub">
+                              {t.Status} · {timeAgo(new Date(t.TransactionDate))}
+                            </div>
                           </div>
-                          <div className="review-time">{timeAgo(new Date(r.DateCreated))}</div>
+                          <div className="profile-list-row-price">₱{parseFloat(t.Price).toLocaleString()}</div>
                         </div>
-                        {r.Comment && <div className="review-text">{r.Comment}</div>}
-                        {r.ProductName && <div className="review-product-ref">On: {r.ProductName}</div>}
+                      ))}
+                    </div>
+                  )
+                ) : tab === 'saved' ? (
+                  saved.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">🤍</div>
+                      <h4>Nothing saved yet</h4>
+                      <p>Heart items on the marketplace to save them here.</p>
+                      <button className="empty-state-action" onClick={() => navigate('/dashboard')}>Browse marketplace</button>
+                    </div>
+                  ) : (
+                    <div className="profile-grid">
+                      {saved.map((p) => {
+                        const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
+                        return (
+                          <article className={`profile-card${p.Status === 'Sold' ? ' sold' : ''}`} key={p.ProductID}>
+                            <Link className="profile-card-open" to={`/product/${p.ProductID}`}>
+                              <div className="profile-card-img">
+                                {imgURL ? <img src={imgURL} alt={p.ProductName} /> : '📦'}
+                                {p.Status === 'Sold' && <span className="profile-status-badge Sold">Sold</span>}
+                              </div>
+                              <div className="profile-card-body">
+                                <h4>{p.ProductName}</h4>
+                                <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
+                              </div>
+                            </Link>
+                            <div className="profile-card-actions saved-actions">
+                              <button type="button" className="delete" onClick={() => handleUnsave(p.ProductID)}>Unsave</button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : tab === 'reviews' ? (
+                  reviews.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">⭐</div>
+                      <h4>No reviews yet</h4>
+                      <p>Reviews from buyers will appear here.</p>
+                      <button className="empty-state-action" onClick={() => navigate('/dashboard')}>Browse marketplace</button>
+                    </div>
+                  ) : (
+                    <div className="reviews-list">
+                      {reviews.map((r) => {
+                        const rInitials = r.ReviewerFirstName && r.ReviewerLastName
+                          ? (r.ReviewerFirstName[0] + r.ReviewerLastName[0]).toUpperCase()
+                          : '?';
+                        return (
+                          <div className="review-card" key={r.ReviewID}>
+                            <div className="review-header">
+                              <div className="reviewer-avatar">{rInitials}</div>
+                              <div>
+                                <div className="reviewer-name">{r.ReviewerFirstName} {r.ReviewerLastName}</div>
+                                <StarLine value={r.Rating} size="0.85rem" />
+                              </div>
+                              <div className="review-time">{timeAgo(new Date(r.DateCreated))}</div>
+                            </div>
+                            {r.Comment && <div className="review-text">{r.Comment}</div>}
+                            {r.ProductName && <div className="review-product-ref">On: {r.ProductName}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : null}
+              </section>
+
+              <aside className="profile-sidebar" aria-label="Seller rating summary">
+                <div className="rating-card">
+                  <div className="rating-card-heading">
+                    <span>SELLER REPUTATION</span>
+                    <span className="rating-card-mark">★</span>
+                  </div>
+                  <div className="rating-big">
+                    <div className="rating-big-num">{rating === '—' ? '0.0' : rating}</div>
+                    <StarLine value={rating === '—' ? 0 : rating} />
+                    <div className="rating-count">{reviewCount} review{reviewCount === 1 ? '' : 's'}</div>
+                  </div>
+                  <div className="rating-bars">
+                    {ratingBars.map((b) => (
+                      <div className="rating-bar-row" key={b.star}>
+                        <span>{b.star}</span>
+                        <div className="rating-bar-bg"><div className="rating-bar-fill" style={{ width: `${b.pct}%` }} /></div>
+                        <span>{b.count}</span>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              )
-            ) : null}
+              </aside>
+            </div>
           </>
         )}
       </main>

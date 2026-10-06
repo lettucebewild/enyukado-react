@@ -326,6 +326,7 @@ export default function Dashboard() {
     onOpenMessages: () => openMessages(null, null),
     onOpenSell: () => openSellModal(null),
     initials,
+    profileImage: user?.profileImage,
     onProfile: () => navigate('/profile'),
     onChangePassword: () => setChangePasswordOpen(true),
     onLogout: handleLogout,
@@ -342,7 +343,8 @@ export default function Dashboard() {
           <span className="hero-orb hero-orb-1" />
           <span className="hero-orb hero-orb-2" />
           <div className="hero-content">
-            <h2>Welcome back{user?.firstName ? `, ${user.firstName}` : ''}.</h2>
+            <div className="hero-eyebrow"><span /> NATIONALIANS' CAMPUS MARKETPLACE</div>
+            <h2>Welcome{user?.isFirstLogin ? '' : ' back'}{user?.firstName ? `, ${user.firstName}` : ''}.</h2>
             <p>Find great deals from fellow students, or give your old stuff a second life.</p>
             <div className="hero-actions">
               <div className="hero-search">
@@ -392,11 +394,26 @@ export default function Dashboard() {
 
         <div className="listings-grid">
           {loadingProducts ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: '#888' }}>Loading...</div>
+            Array.from({ length: 6 }, (_, i) => (
+              <div className="listing-skeleton" key={i} aria-hidden="true">
+                <div className="skeleton-shimmer skeleton-image" />
+                <div className="skeleton-shimmer skeleton-line" />
+                <div className="skeleton-shimmer skeleton-line short" />
+              </div>
+            ))
           ) : products === null ? (
             <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--red)' }}>Failed to load listings. Is the server running?</div>
           ) : products.length === 0 ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: '#888' }}>No listings found.</div>
+            <div className="dash-empty-state">
+              <div className="empty-state-icon">🔎</div>
+              <h3>No listings found</h3>
+              <p>{activeSearch || activeCategory ? 'Try clearing your filters to see more items.' : 'Be the first to share something with your campus.'}</p>
+              {activeSearch || activeCategory ? (
+                <button className="dash-empty-action" onClick={clearFilters}>Clear filters</button>
+              ) : (
+                <button className="dash-empty-action" onClick={() => openSellModal(null)}>Post your first listing</button>
+              )}
+            </div>
           ) : (
             products.map((p) => {
               const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
@@ -428,7 +445,10 @@ export default function Dashboard() {
         </div>
         <div className="activity-list">
           {activity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 24, color: '#888', fontSize: '0.88rem' }}>No activity yet.</div>
+            <div className="dash-activity-empty">
+              <span>No activity yet.</span>
+              <button type="button" onClick={() => openSellModal(null)}>Post a listing</button>
+            </div>
           ) : (
             activity.map((a, i) => (
               <div className="activity-item" key={i}>
@@ -458,6 +478,7 @@ export default function Dashboard() {
           onOpenPayment={setPaymentProduct}
           onOpenCategory={browseCategory}
           cart={cart}
+          onDeleted={() => { loadProducts(); loadActivity(); navigate('/dashboard', { replace: true }); }}
           headerProps={{ ...headerProps, onBrandClick: goHome }}
         />
       )}

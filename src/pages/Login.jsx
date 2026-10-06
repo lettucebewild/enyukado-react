@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { login, register } from '../api/authApi.js';
+import {
+  login,
+  register,
+  requestPasswordResetCode,
+  resetPassword,
+  verifyPasswordResetCode,
+} from '../api/authApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../hooks/useToast.js';
 import Toast from '../components/Toast.jsx';
@@ -59,10 +65,21 @@ export default function Login() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginErrorField, setLoginErrorField] = useState(null);
 
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState('email');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotPassword, setForgotPassword] = useState('');
+  const [forgotConfirm, setForgotConfirm] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotErrorField, setForgotErrorField] = useState(null);
+
   const [signupForm, setSignupForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     confirm: '',
   });
@@ -93,7 +110,7 @@ export default function Login() {
     try {
       const data = await login({ email: loginEmail.trim(), password: loginPassword });
       signIn(data);
-      showToast(`Welcome back, ${data.user.firstName}!`);
+      showToast(`${data.user.isFirstLogin ? 'Welcome' : 'Welcome back'}, ${data.user.firstName}!`);
       setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err) {
       if (err.data?.message?.toLowerCase().includes('pending')) {
@@ -109,7 +126,7 @@ export default function Login() {
   // ---- signup: validate, then open privacy modal ----
   function handleSignupSubmit(e) {
     e.preventDefault();
-    const { firstName, lastName, email, password, confirm } = signupForm;
+    const { firstName, lastName, email, phoneNumber, password, confirm } = signupForm;
 
     if (!firstName) return fail(setSignupErrorField, 'firstName', 'First name is required');
     if (!NAME_REGEX.test(firstName))
@@ -121,6 +138,12 @@ export default function Login() {
     if (!email.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
       return fail(setSignupErrorField, 'email', `Only ${ALLOWED_DOMAIN} emails are allowed`);
     }
+    if (!phoneNumber) {
+      return fail(setSignupErrorField, 'phoneNumber', 'Phone number is required');
+    }
+    if (!/^[0-9+\s()-]{10,15}$/.test(phoneNumber.trim())) {
+      return fail(setSignupErrorField, 'phoneNumber', 'Please enter a valid phone number');
+    }
     if (!password) return fail(setSignupErrorField, 'password', 'Password is required');
     if (!PASSWORD_REGEX.test(password)) {
       return fail(
@@ -131,7 +154,13 @@ export default function Login() {
     }
     if (password !== confirm) return fail(setSignupErrorField, 'confirm', 'Passwords do not match');
 
-    pendingSignupData.current = { firstName, lastName, email, password };
+    pendingSignupData.current = {
+      firstName,
+      lastName,
+      email,
+      phoneNumber: phoneNumber.trim() || null,
+      password,
+    };
     setPrivacyOpen(true);
   }
 
@@ -141,7 +170,14 @@ export default function Login() {
     try {
       await register(pendingSignupData.current);
       setPrivacyOpen(false);
-      setSignupForm({ firstName: '', lastName: '', email: '', password: '', confirm: '' });
+      setSignupForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        password: '',
+        confirm: '',
+      });
       setMode('login');
       setPendingApproval(true);
       showToast('Account submitted! Awaiting admin approval.');
@@ -157,6 +193,98 @@ export default function Login() {
   function handlePrivacyCancel() {
     setPrivacyOpen(false);
     pendingSignupData.current = null;
+  }
+
+  function resetForgotPasswordState() {
+    setForgotPasswordOpen(false);
+    setForgotStep('email');
+    setForgotEmail('');
+    setForgotIdentifier('');
+    setForgotCode('');
+    setForgotPassword('');
+    setForgotConfirm('');
+    setForgotLoading(false);
+    setForgotErrorField(null);
+  }
+
+  async function sendForgotPasswordCode(email) {
+    const data = await requestPasswordResetCode({ identifier: email });
+    setForgotIdentifier(data?.identifier || email);
+    setForgotStep('code');
+    setForgotErrorField(null);
+    showToast(data?.message || 'Verification code sent to your university email.', 'success');
+  }
+
+  async function handleForgotPasswordRequest(e) {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+
+    if (!email) return fail(setForgotErrorField, 'email', 'Please enter your university email');
+    if (!email.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
+      return fail(setForgotErrorField, 'email', `Only ${ALLOWED_DOMAIN} emails are allowed`);
+    }
+
+    setForgotLoading(true);
+    try {
+      await sendForgotPasswordCode(email);
+    } catch (err) {
+      fail(setForgotErrorField, 'email', err.data?.message || 'Unable to send a verification code');
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
+  async function handleForgotPasswordVerify(e) {
+    e.preventDefault();
+    if (!forgotCode.trim()) return fail(setForgotErrorField, 'code', 'Please enter the verification code');
+
+    setForgotLoading(true);
+    try {
+      await verifyPasswordResetCode({
+        identifier: forgotIdentifier || forgotEmail.trim(),
+        code: forgotCode.trim(),
+      });
+      setForgotStep('reset');
+      setForgotErrorField(null);
+      showToast('Code verified. Please choose a new password.', 'success');
+    } catch (err) {
+      fail(setForgotErrorField, 'code', err.data?.message || 'Verification failed');
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
+  async function handleForgotPasswordReset(e) {
+    e.preventDefault();
+    if (!forgotPassword) return fail(setForgotErrorField, 'password', 'Please enter a new password');
+    if (!PASSWORD_REGEX.test(forgotPassword)) {
+      return fail(
+        setForgotErrorField,
+        'password',
+        'Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character'
+      );
+    }
+    if (forgotPassword !== forgotConfirm) {
+      return fail(setForgotErrorField, 'confirm', 'Passwords do not match');
+    }
+
+    setForgotLoading(true);
+    try {
+      await resetPassword({
+        identifier: forgotIdentifier || forgotEmail.trim(),
+        code: forgotCode.trim(),
+        newPassword: forgotPassword,
+      });
+      showToast('Password reset successfully. Please log in with your new password.', 'success');
+      setLoginEmail(forgotEmail.trim());
+      setLoginPassword('');
+      resetForgotPasswordState();
+      setMode('login');
+    } catch (err) {
+      fail(setForgotErrorField, 'password', err.data?.message || 'Password reset failed');
+    } finally {
+      setForgotLoading(false);
+    }
   }
 
   return (
@@ -237,7 +365,7 @@ export default function Login() {
         {/* RIGHT PANEL */}
         <div className="right-panel">
           <div className="right-inner">
-            {mode === 'login' && (
+            {!forgotPasswordOpen && mode === 'login' && (
               <form className="form-card" onSubmit={handleLogin}>
                 <div className="form-header">
                   <h2>Student Login</h2>
@@ -280,9 +408,22 @@ export default function Login() {
                   <a
                     href="#"
                     className="forgot-link"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
-                      showToast('Please contact contact.enyukado@gmail.com to reset your password.');
+                      const email = loginEmail.trim();
+                      setForgotEmail(email);
+                      setForgotPasswordOpen(true);
+                      setForgotStep('email');
+                      setForgotErrorField(null);
+                      if (!email || !email.toLowerCase().endsWith(ALLOWED_DOMAIN)) return;
+                      setForgotLoading(true);
+                      try {
+                        await sendForgotPasswordCode(email);
+                      } catch (err) {
+                        fail(setForgotErrorField, 'email', err.data?.message || 'Unable to send a verification code');
+                      } finally {
+                        setForgotLoading(false);
+                      }
                     }}
                   >
                     Forgot password?
@@ -315,7 +456,125 @@ export default function Login() {
               </form>
             )}
 
-            {mode === 'signup' && (
+            {forgotPasswordOpen && (
+              <form
+                className="form-card"
+                onSubmit={
+                  forgotStep === 'email'
+                    ? handleForgotPasswordRequest
+                    : forgotStep === 'code'
+                      ? handleForgotPasswordVerify
+                      : handleForgotPasswordReset
+                }
+              >
+                <div className="form-header">
+                  <h2>Reset password</h2>
+                  <p>
+                    {forgotStep === 'email'
+                      ? 'Enter your university email to receive a verification code.'
+                      : forgotStep === 'code'
+                        ? 'Enter the verification code sent to your university email.'
+                        : 'Choose a new password to finish resetting your account.'}
+                  </p>
+                </div>
+
+                {forgotStep === 'email' && (
+                  <div className="input-group">
+                    <label htmlFor="forgotEmail">University Email</label>
+                    <div className="input-wrap">
+                      <MailIcon />
+                      <input
+                        id="forgotEmail"
+                        type="email"
+                        placeholder="Enter your university email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        style={forgotErrorField === 'email' ? { borderColor: '#e0504a' } : undefined}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {forgotStep === 'code' && (
+                  <div className="input-group">
+                    <label htmlFor="forgotCode">Verification Code</label>
+                    <div className="input-wrap">
+                      <span className="input-icon">🔐</span>
+                      <input
+                        id="forgotCode"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Enter 6-digit code"
+                        value={forgotCode}
+                        maxLength={6}
+                        onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        style={forgotErrorField === 'code' ? { borderColor: '#e0504a' } : undefined}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {forgotStep === 'reset' && (
+                  <>
+                    <PasswordInput
+                      id="forgotPassword"
+                      label="New Password"
+                      placeholder="Create a new password"
+                      value={forgotPassword}
+                      onChange={setForgotPassword}
+                      errored={forgotErrorField === 'password'}
+                    />
+                    <PasswordInput
+                      id="forgotConfirm"
+                      label="Confirm Password"
+                      placeholder="Confirm password"
+                      value={forgotConfirm}
+                      onChange={setForgotConfirm}
+                      errored={forgotErrorField === 'confirm'}
+                    />
+                  </>
+                )}
+
+                <button className="btn-primary" type="submit" disabled={forgotLoading}>
+                  {forgotLoading
+                    ? forgotStep === 'email'
+                      ? 'Sending code...'
+                      : forgotStep === 'code'
+                        ? 'Verifying...'
+                        : 'Updating password...'
+                    : forgotStep === 'email'
+                      ? 'Send code to email'
+                      : forgotStep === 'code'
+                        ? 'Verify code'
+                        : 'Update password'}
+                </button>
+
+                {forgotStep === 'code' && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ marginTop: '10px' }}
+                    onClick={() => handleForgotPasswordRequest({ preventDefault() {} })}
+                  >
+                    Resend code
+                  </button>
+                )}
+
+                <p className="switch-cta" style={{ marginTop: '16px' }}>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      resetForgotPasswordState();
+                    }}
+                  >
+                    Back to log in
+                  </a>
+                </p>
+              </form>
+            )}
+
+            {!forgotPasswordOpen && mode === 'signup' && (
               <form className="form-card" onSubmit={handleSignupSubmit}>
                 <div className="form-header">
                   <h2>Create account</h2>
@@ -366,6 +625,22 @@ export default function Login() {
                       value={signupForm.email}
                       onChange={(e) => setSignupForm((f) => ({ ...f, email: e.target.value }))}
                       style={signupErrorField === 'email' ? { borderColor: '#e0504a' } : undefined}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="signupPhone">Phone Number</label>
+                  <div className="input-wrap">
+                    <span className="input-icon">📱</span>
+                    <input
+                      id="signupPhone"
+                      type="tel"
+                      placeholder="09XXXXXXXXX"
+                      required
+                      value={signupForm.phoneNumber}
+                      onChange={(e) => setSignupForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                      style={signupErrorField === 'phoneNumber' ? { borderColor: '#e0504a' } : undefined}
                     />
                   </div>
                 </div>

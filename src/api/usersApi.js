@@ -17,3 +17,9 @@ export function uploadQRCode(file, token) {
   fd.append('qrCode', file);
   return apiClient.postForm('/users/qr', fd, { token });
 }
+
+export function uploadProfilePhoto(file, token) {
+  const fd = new FormData();
+  fd.append('profilePhoto', file);
+  return apiClient.postForm('/users/photo', fd, { token });
+}

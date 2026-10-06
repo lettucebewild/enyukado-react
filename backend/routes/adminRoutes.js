@@ -1,5 +1,7 @@
 const express = require('express');
 const router  = express.Router();
+const fs      = require('fs');
+const path    = require('path');
 const auth    = require('../middleware/auth');
 const { User, Product, Category, Transaction, SavedItem, NO_ID } = require('../models');
 const { sendBotMessage } = require('../services/messaging');
@@ -23,6 +25,17 @@ function adminOnly(req, res, next) {
 
 // System notifications are sent FROM the Enyukado Bot account
 const sendSystemMessage = sendBotMessage;
+const productUploadsDir = path.join(__dirname, '..', 'uploads', 'products');
+
+function deleteProductImageFiles(images, primaryImageURL) {
+    const imageURLs = [...(images || []).map(image => image.ImageURL), primaryImageURL];
+    for (const imageURL of new Set(imageURLs)) {
+        if (!imageURL || !imageURL.includes('/uploads/products/')) continue;
+        const filename = path.basename(imageURL.split('/uploads/products/')[1]);
+        const filePath = path.join(productUploadsDir, filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+}
 
 // ============================================================
 // ROUTES — all require auth + adminOnly
@@ -44,6 +57,93 @@ router.get('/accounts/pending', auth, adminOnly, async (req, res) => {
         res.json(users);
     } catch (err) {
         sendError(res, 'Get Pending Accounts Error', err);
+    }
+});
+
+// --- A1b. GET ALL STUDENT ACCOUNTS ---
+// GET /api/admin/accounts/all
+router.get('/accounts/all', auth, adminOnly, async (req, res) => {
+    try {
+        const users = await User.find(
+            { IsAdmin: { $ne: true } },
+            { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1, Email: 1, IsApproved: 1, DateCreated: 1 }
+        ).sort({ DateCreated: -1 }).lean();
+
+        res.json(users);
+    } catch (err) {
+        sendError(res, 'Get All Accounts Error', err);
+    }
+});
+
+// --- A1c. GET STUDENT ACCOUNT DETAILS ---
+// GET /api/admin/accounts/:id/details
+router.get('/accounts/:id/details', auth, adminOnly, async (req, res) => {
+    const userID = toInt(req.params.id);
+    if (userID === null) return res.status(400).json({ message: 'Invalid account ID.' });
+
+    try {
+        const account = await User.findOne(
+            { UserID: userID, IsAdmin: { $ne: true } },
+            { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1, Email: 1, PhoneNumber: 1,
+              IsApproved: 1, DateCreated: 1, ProfileImage: 1, Bio: 1, Course: 1, Year: 1, CampusArea: 1 }
+        ).lean();
+        if (!account) return res.status(404).json({ message: 'Student account not found.' });
+
+        const [listings, transactions] = await Promise.all([
+            Product.find(
+                { UserID: userID },
+                { ...NO_ID, ProductID: 1, ProductName: 1, Price: 1, ProductCondition: 1,
+                  Quantity: 1, Status: 1, DatePosted: 1, ImageURL: 1, CategoryID: 1 }
+            ).sort({ DatePosted: -1 }).lean(),
+            Transaction.find(
+                { BuyerID: userID },
+                { ...NO_ID, TransactionID: 1, ProductID: 1, SellerID: 1, Status: 1, TransactionDate: 1 }
+            ).sort({ TransactionDate: -1 }).lean()
+        ]);
+
+        const [purchasedProducts, categories, sellers] = await Promise.all([
+            Product.find(
+                { ProductID: { $in: transactions.map((transaction) => transaction.ProductID) } },
+                { ...NO_ID, ProductID: 1, ProductName: 1, Price: 1, ImageURL: 1, CategoryID: 1 }
+            ).lean(),
+            Category.find(
+                { CategoryID: { $in: [...listings, ...transactions].map((item) => item.CategoryID).filter(Boolean) } },
+                { ...NO_ID, CategoryID: 1, CategoryName: 1 }
+            ).lean(),
+            User.find(
+                { UserID: { $in: transactions.map((transaction) => transaction.SellerID) } },
+                { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1 }
+            ).lean()
+        ]);
+
+        const productMap = indexBy(purchasedProducts, 'ProductID');
+        const categoryMap = indexBy(categories, 'CategoryID');
+        const sellerMap = indexBy(sellers, 'UserID');
+
+        res.json({
+            account,
+            listings: listings.map((product) => ({
+                ...product,
+                CategoryName: categoryMap.get(product.CategoryID)?.CategoryName ?? null
+            })),
+            purchases: transactions.map((transaction) => {
+                const product = productMap.get(transaction.ProductID);
+                const seller = sellerMap.get(transaction.SellerID);
+                return {
+                    TransactionID: transaction.TransactionID,
+                    Status: transaction.Status,
+                    TransactionDate: transaction.TransactionDate,
+                    ProductID: transaction.ProductID,
+                    ProductName: product?.ProductName ?? 'Listing no longer available',
+                    Price: product?.Price ?? null,
+                    ImageURL: product?.ImageURL ?? null,
+                    CategoryName: product ? categoryMap.get(product.CategoryID)?.CategoryName ?? null : null,
+                    SellerName: seller ? `${seller.FirstName} ${seller.LastName}` : 'Unknown seller'
+                };
+            })
+        });
+    } catch (err) {
+        sendError(res, 'Get Account Details Error', err);
     }
 });
 
@@ -101,6 +201,44 @@ router.patch('/accounts/:id/reject', auth, adminOnly, async (req, res) => {
 // -------------------------------------------------------
 // SECTION B: LISTING APPROVALS
 // -------------------------------------------------------
+
+// --- B0. GET ALL LISTINGS ---
+// GET /api/admin/listings/all
+router.get('/listings/all', auth, adminOnly, async (req, res) => {
+    try {
+        const products = await Product.find({}, NO_ID).sort({ DatePosted: -1 }).lean();
+        const [categories, sellers] = await Promise.all([
+            Category.find({ CategoryID: { $in: products.map(p => p.CategoryID) } }, NO_ID).lean(),
+            User.find({ UserID: { $in: products.map(p => p.UserID) } },
+                { ...NO_ID, UserID: 1, FirstName: 1, LastName: 1, Email: 1 }).lean()
+        ]);
+        const categoryMap = indexBy(categories, 'CategoryID');
+        const sellerMap = indexBy(sellers, 'UserID');
+
+        res.json(products.map(p => {
+            const seller = sellerMap.get(p.UserID);
+            return {
+                ProductID: p.ProductID,
+                ProductName: p.ProductName,
+                Price: p.Price,
+                ProductCondition: p.ProductCondition,
+                Description: p.Description,
+                Quantity: p.Quantity,
+                ImageURL: p.ImageURL,
+                DatePosted: p.DatePosted,
+                Status: p.Status,
+                CategoryName: categoryMap.get(p.CategoryID)?.CategoryName ?? null,
+                SellerID: seller?.UserID ?? p.UserID,
+                SellerFirstName: seller?.FirstName ?? 'Unknown',
+                SellerLastName: seller?.LastName ?? '',
+                SellerEmail: seller?.Email ?? '',
+                images: (p.images || []).slice().sort((a, b) => a.SortOrder - b.SortOrder)
+            };
+        }));
+    } catch (err) {
+        sendError(res, 'Get All Listings Error', err);
+    }
+});
 
 // --- B1. GET ALL PENDING LISTINGS ---
 // GET /api/admin/listings/pending
@@ -215,6 +353,29 @@ router.patch('/listings/:id/reject', auth, adminOnly, async (req, res) => {
         res.json({ message: 'Listing rejected and removed. Seller has been notified.' });
     } catch (err) {
         sendError(res, 'Reject Listing Error', err);
+    }
+});
+
+// --- B4. DELETE ANY LISTING ---
+// DELETE /api/admin/listings/:id
+router.delete('/listings/:id', auth, adminOnly, async (req, res) => {
+    const productID = toInt(req.params.id);
+    try {
+        const product = productID === null ? null
+            : await Product.findOne({ ProductID: productID }, { ProductID: 1, ImageURL: 1, images: 1 }).lean();
+        if (!product) return res.status(404).json({ message: 'Product not found.' });
+
+        const hasTransactions = await Transaction.exists({ ProductID: productID });
+        if (hasTransactions) {
+            return res.status(400).json({ message: 'This listing has purchase records and cannot be deleted.' });
+        }
+
+        deleteProductImageFiles(product.images, product.ImageURL);
+        await Product.deleteOne({ ProductID: productID });
+        await SavedItem.deleteMany({ ProductID: productID });
+        res.json({ message: 'Listing deleted successfully.' });
+    } catch (err) {
+        sendError(res, 'Admin Delete Listing Error', err);
     }
 });
 
@@ -384,13 +545,15 @@ router.patch('/payments/:id/reject', auth, adminOnly, async (req, res) => {
 // Returns pending counts for all three approval sections
 router.get('/counts', auth, adminOnly, async (req, res) => {
     try {
-        const [pendingAccounts, pendingListings, pendingPayments] = await Promise.all([
+        const [pendingAccounts, totalAccounts, pendingListings, pendingPayments, totalListings] = await Promise.all([
             User.countDocuments({ IsApproved: false, IsAdmin: false }),
+            User.countDocuments({ IsAdmin: { $ne: true } }),
             Product.countDocuments({ Status: 'Pending Approval' }),
-            Transaction.countDocuments({ Status: 'Pending' })
+            Transaction.countDocuments({ Status: 'Pending' }),
+            Product.countDocuments({})
         ]);
 
-        res.json({ pendingAccounts, pendingListings, pendingPayments });
+        res.json({ pendingAccounts, totalAccounts, pendingListings, pendingPayments, totalListings });
     } catch (err) {
         sendError(res, 'Get Admin Counts Error', err);
     }

@@ -32,6 +32,7 @@ export default function AppHeader({
   onOpenSell,
   onBrandClick,
   initials,
+  profileImage,
   onProfile,
   onChangePassword,
   onLogout,
@@ -87,6 +88,7 @@ export default function AppHeader({
           </button>
           <ProfileMenu
             initials={initials}
+            profileImage={profileImage}
             onProfile={onProfile}
             onChangePassword={onChangePassword}
             onLogout={onLogout}
