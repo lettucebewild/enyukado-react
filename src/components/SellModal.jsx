@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createProduct, updateProduct } from '../api/productsApi.js';
 import AppHeader from './AppHeader.jsx';
+import './SellModal.css';
 
 const CONDITIONS = ['Brand new', 'Like new', 'Lightly used', 'Well used', 'Heavily used'];
+const MAX_PHOTOS = 5;
+const MAX_BYTES = 10 * 1024 * 1024;
+const DESC_MAX = 500;
 
 export default function SellModal({ open, onClose, categories, token, editData, onSaved, onToast, headerProps }) {
   const [form, setForm] = useState(emptyForm());
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef(null);
 
   function emptyForm() {
     return { name: '', price: '', categoryID: '', condition: '', description: '', quantity: 1 };
@@ -29,29 +35,56 @@ export default function SellModal({ open, onClose, categories, token, editData, 
       setForm(emptyForm());
     }
     setFiles([]);
-    setPreviews([]);
+    setPreviews((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return []; });
   }, [open, editData]);
 
   if (!open) return null;
 
-  function handleImagesSelected(e) {
-    const newFiles = Array.from(e.target.files);
-    const remaining = 5 - files.length;
-    if (remaining <= 0) return;
-    const toAdd = newFiles.slice(0, remaining);
-    if (newFiles.length > remaining) onToast?.(`Only ${remaining} more photo(s) allowed (max 5).`, 'error');
-    toAdd.forEach((file) => {
-      setFiles((f) => [...f, file]);
-      const reader = new FileReader();
-      reader.onload = (ev) => setPreviews((p) => [...p, ev.target.result]);
-      reader.readAsDataURL(file);
+  function addFiles(list) {
+    const incoming = Array.from(list || []);
+    if (!incoming.length) return;
+    const remaining = MAX_PHOTOS - files.length;
+    if (remaining <= 0) return onToast?.(`You can only add ${MAX_PHOTOS} photos.`, 'error');
+
+    const valid = incoming.filter((f) => {
+      if (!/^image\/(jpe?g|png|webp)$/i.test(f.type)) {
+        onToast?.(`${f.name} isn't a JPG, PNG or WEBP image.`, 'error');
+        return false;
+      }
+      if (f.size > MAX_BYTES) {
+        onToast?.(`${f.name} is over 10MB.`, 'error');
+        return false;
+      }
+      return true;
     });
+    const toAdd = valid.slice(0, remaining);
+    if (valid.length > remaining) onToast?.(`Only ${remaining} more photo(s) allowed (max ${MAX_PHOTOS}).`, 'error');
+    if (!toAdd.length) return;
+
+    setFiles((f) => [...f, ...toAdd]);
+    setPreviews((p) => [...p, ...toAdd.map((file) => URL.createObjectURL(file))]);
+  }
+
+  function handleImagesSelected(e) {
+    addFiles(e.target.files);
     e.target.value = '';
   }
 
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    addFiles(e.dataTransfer.files);
+  }
+
   function removeImage(index) {
+    URL.revokeObjectURL(previews[index]);
     setFiles((f) => f.filter((_, i) => i !== index));
     setPreviews((p) => p.filter((_, i) => i !== index));
+  }
+
+  function stepQty(delta) {
+    const next = Math.max(1, (parseInt(form.quantity, 10) || 1) + delta);
+    setForm({ ...form, quantity: next });
   }
 
   async function handleSubmit() {
@@ -88,84 +121,149 @@ export default function SellModal({ open, onClose, categories, token, editData, 
     }
   }
 
+  const qty = parseInt(form.quantity, 10) || 1;
+  const priceNum = Number(form.price) || 0;
+
   return (
     <div className="fullpanel-overlay">
-      <AppHeader {...headerProps} onBack={onClose} title={editData ? 'Update listing' : 'Post a listing'} />
+      <AppHeader {...headerProps} onBack={onClose} title={editData ? 'Update listing' : 'Post your first listing'} />
 
       <div className="fullpanel-body">
-      <div className="sell-panel-inner">
-        <div className="modal-field">
-          <label>Item name</label>
-          <input type="text" placeholder="e.g. Engineering Math Vol. 2" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </div>
-        <div className="modal-row">
-          <div className="modal-field">
-            <label>Price (₱)</label>
-            <input type="number" placeholder="0.00" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-          </div>
-          <div className="modal-field">
-            <label>Quantity</label>
-            <input type="number" placeholder="1" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-          </div>
-        </div>
-        <div className="modal-row">
-          <div className="modal-field">
-            <label>Category</label>
-            <select value={form.categoryID} onChange={(e) => setForm({ ...form, categoryID: e.target.value })}>
-              <option value="">Select category</option>
-              {categories.map((c) => (
-                <option key={c.CategoryID} value={c.CategoryID}>{c.CategoryName}</option>
-              ))}
-            </select>
-          </div>
-          <div className="modal-field">
-            <label>Condition</label>
-            <select value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>
-              <option value="">Select condition</option>
-              {CONDITIONS.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="modal-field">
-          <label>Description</label>
-          <textarea placeholder="Describe the item, any defects, why you're selling…" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        </div>
+        <div className="sl-page">
+          <div className="sl-box">
+          <div className="sl-grid">
+            {/* ---------- LEFT: photos ---------- */}
+            <section className="sl-col sl-card-photos">
+              <header className="sl-card-head">
+                <div>
+                  <h3>Photos</h3>
+                  <p>{editData ? 'Add new photos to replace the current ones (optional)' : '1 required · up to 5'}</p>
+                </div>
+                <span className="sl-count">{files.length}/{MAX_PHOTOS}</span>
+              </header>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--charcoal-2)', display: 'block', marginBottom: 8 }}>
-            Photos <span style={{ color: 'var(--charcoal-3)', fontWeight: 300 }}>(1 required, max 5)</span>
-          </label>
-          <div className="img-preview-grid">
-            {previews.map((src, i) => (
-              <div className="img-thumb" key={i}>
-                <img src={src} alt={`photo ${i + 1}`} />
-                <button className="img-thumb-remove" type="button" onClick={() => removeImage(i)}>✕</button>
-                {i === 0 && <div className="img-thumb-primary">MAIN</div>}
-              </div>
-            ))}
-          </div>
-          <div className="upload-count">{files.length} / 5 photos</div>
-          {files.length < 5 && (
-            <div className="upload-zone">
-              <input type="file" accept="image/*" multiple onChange={handleImagesSelected} />
-              <div className="upload-zone-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-              </div>
-              <div className="upload-zone-title">Click or drag to upload photos</div>
-              <div className="upload-zone-sub">JPG, PNG, WEBP · <span>Max 10MB each</span> · 1–5 photos</div>
-            </div>
-          )}
-        </div>
+              {previews.length > 0 && (
+                <div className="sl-photos">
+                  {previews.map((src, i) => (
+                    <div className={`sl-photo${i === 0 ? ' is-cover' : ''}`} key={src}>
+                      <img src={src} alt={`photo ${i + 1}`} />
+                      {i === 0 && <span className="sl-photo-main">Cover</span>}
+                      <button type="button" className="sl-photo-remove" aria-label={`Remove photo ${i + 1}`} onClick={() => removeImage(i)}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-        <button className="btn-modal-submit" disabled={submitting} onClick={handleSubmit}>
-          {submitting ? 'Submitting…' : (
-            <>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              {editData ? 'Update listing' : 'Post listing'}
-            </>
-          )}
-        </button>
-      </div>
+              {files.length < MAX_PHOTOS && (
+                <div
+                  className={`sl-drop${dragging ? ' dragging' : ''}${previews.length ? ' compact' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImagesSelected} onClick={(e) => e.stopPropagation()} />
+                  <div className="sl-drop-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                  </div>
+                  <div className="sl-drop-title">{dragging ? 'Drop to add photos' : previews.length ? 'Add more photos' : 'Click or drag to upload photos'}</div>
+                  <div className="sl-drop-sub">JPG, PNG, WEBP · Max 10MB each</div>
+                </div>
+              )}
+
+              <ul className="sl-tips">
+                <li>Use clear, well-lit photos from multiple angles</li>
+                <li>Show any scratches or defects up close</li>
+                <li>The first photo is your cover image</li>
+              </ul>
+            </section>
+            {/* ---------- RIGHT: details ---------- */}
+            <section className="sl-col">
+              <header className="sl-card-head">
+                <div>
+                  <h3>Item details</h3>
+                  <p>Tell buyers what you're selling</p>
+                </div>
+              </header>
+
+              <div className="sl-field">
+                <label htmlFor="sl-name">Item name</label>
+                <input id="sl-name" type="text" maxLength={100} placeholder="e.g. Engineering Math Vol. 2" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+
+              <div className="sl-row">
+                <div className="sl-field">
+                  <label htmlFor="sl-price">Price</label>
+                  <div className="sl-input-prefix">
+                    <span>₱</span>
+                    <input id="sl-price" type="number" placeholder="0.00" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                  </div>
+                </div>
+                <div className="sl-field">
+                  <label>Quantity</label>
+                  <div className="sl-stepper">
+                    <button type="button" aria-label="Decrease quantity" onClick={() => stepQty(-1)} disabled={qty <= 1}>−</button>
+                    <input type="number" min="1" aria-label="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+                    <button type="button" aria-label="Increase quantity" onClick={() => stepQty(1)}>+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="sl-field">
+                <label htmlFor="sl-cat">Category</label>
+                <select id="sl-cat" value={form.categoryID} onChange={(e) => setForm({ ...form, categoryID: e.target.value })}>
+                  <option value="">Select category</option>
+                  {categories.map((c) => (
+                    <option key={c.CategoryID} value={c.CategoryID}>{c.CategoryName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sl-field">
+                <label>Condition</label>
+                <div className="sl-chips" role="radiogroup" aria-label="Condition">
+                  {CONDITIONS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.condition === c}
+                      className={`sl-chip${form.condition === c ? ' active' : ''}`}
+                      onClick={() => setForm({ ...form, condition: c })}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="sl-field">
+                <label htmlFor="sl-desc">Description <em>(optional)</em></label>
+                <textarea
+                  id="sl-desc"
+                  maxLength={DESC_MAX}
+                  placeholder="Describe the item, any defects, why you're selling…"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                />
+                <div className="sl-counter">{form.description.length} / {DESC_MAX}</div>
+              </div>
+            </section>
+
+          </div>
+
+          <div className="sl-actions">
+            <button className="sl-submit" type="button" disabled={submitting} onClick={handleSubmit}>
+              {submitting ? 'Submitting…' : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  {editData ? 'Update listing' : 'Post listing'}
+                </>
+              )}
+            </button>
+          </div>
+          </div>
+        </div>
       </div>
     </div>
   );

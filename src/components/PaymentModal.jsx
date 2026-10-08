@@ -84,7 +84,7 @@ export default function PaymentModal({ product, token, onClose, onSuccess, onToa
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="payment-modal">
         <div style={{ padding: '26px 36px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontFamily: "'Sora',sans-serif", fontSize: '1.3rem', fontWeight: 700, color: 'var(--charcoal)' }}>Complete Purchase</h3>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: '1.3rem', fontWeight: 700, color: 'var(--charcoal)' }}>Complete Purchase</h3>
           <button className="modal-close" onClick={onClose}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
@@ -176,19 +176,19 @@ export default function PaymentModal({ product, token, onClose, onSuccess, onToa
 
           {step === 2 && method === 'Online Banking' && (
             <div>
-              <div style={{ background: 'linear-gradient(135deg,#326fca,#4e87d4)', borderRadius: 12, padding: '20px 22px', marginBottom: 18, color: 'white' }}>
+              <div style={{ background: 'linear-gradient(135deg,#d3e4f9,#ffe3d2)', borderRadius: 12, padding: '20px 22px', marginBottom: 18, color: '#26324a' }}>
                 <div style={{ fontSize: '0.7rem', letterSpacing: '0.1em', opacity: 0.7, marginBottom: 16 }}>ENYUKADO · ONLINE BANKING</div>
-                <div style={{ fontFamily: "'Sora',sans-serif", fontSize: '1.3rem', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 16 }}>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: '1.3rem', fontWeight: 700, letterSpacing: '0.12em', marginBottom: 16 }}>
                   {cardNum || '•••• •••• •••• ••••'}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <div>
                     <div style={{ fontSize: '0.65rem', opacity: 0.7, marginBottom: 2 }}>CARD HOLDER</div>
-                    <div style={{ fontFamily: "'Sora',sans-serif", fontSize: '0.88rem', fontWeight: 600 }}>{cardName || 'Your Name'}</div>
+                    <div style={{ fontFamily: "var(--font-body)", fontSize: '0.88rem', fontWeight: 600 }}>{cardName || 'Your Name'}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: '0.65rem', opacity: 0.7, marginBottom: 2 }}>EXPIRES</div>
-                    <div style={{ fontFamily: "'Sora',sans-serif", fontSize: '0.88rem' }}>{cardExp || 'MM/YY'}</div>
+                    <div style={{ fontFamily: "var(--font-body)", fontSize: '0.88rem' }}>{cardExp || 'MM/YY'}</div>
                   </div>
                 </div>
               </div>

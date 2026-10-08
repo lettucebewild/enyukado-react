@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminLogin, getAdminSession, setAdminSession } from '../api/adminApi.js';
+import BrandLogo from '../components/BrandLogo.jsx';
 import './AdminLogin.css';
 
 const icon = (children) => (
@@ -53,12 +54,7 @@ export default function AdminLogin() {
       <section className="al-left">
         <div className="al-left-inner">
           <div className="al-brand">
-            <span className="al-brand-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="#326fca" />
-              <path d="M7 8h2l2.5 9h8l2-6H11" stroke="#ffe7be" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="13.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-              <circle cx="19.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-            </svg></span>
+            <span className="al-brand-icon"><BrandLogo size={26} stroke="#8fbbee" /></span>
             <span className="al-brand-name">Enyukado</span>
           </div>
 

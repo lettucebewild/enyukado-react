@@ -3,16 +3,16 @@
 
 .legal-page {
   min-height: 100vh;
-  background: var(--light);
+  background: var(--white);
   color: var(--charcoal);
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
 }
 
 .legal-page .legal-nav {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--light);
+  background: var(--white);
   border-bottom: 1px solid rgba(50, 111, 202, 0.12);
   padding: 0 48px;
   height: 60px;
@@ -51,12 +51,12 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 4px 12px;
-  border-radius: 100px;
+  border-radius: var(--r-pill);
   margin-bottom: 18px;
 }
 
 .legal-page .legal-title {
-  font-family: 'Sora', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   font-weight: 700;
   color: var(--charcoal);
@@ -81,7 +81,7 @@
 .legal-page .legal-section { margin-bottom: 40px; }
 
 .legal-page .legal-section h2 {
-  font-family: 'Sora', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--charcoal);

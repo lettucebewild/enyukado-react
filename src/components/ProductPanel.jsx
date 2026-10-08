@@ -279,15 +279,20 @@ export default function ProductPanel({
                     </button>
                     <button
                       className={`btn-add-cart${inCart ? ' added' : ''}`}
-                      disabled={outOfStock}
+                      disabled={outOfStock && !inCart}
+                      title={inCart ? 'Click to remove from cart' : undefined}
                       onClick={() => {
-                        if (inCart) return;
+                        if (inCart) {
+                          cart?.removeFromCart(product.ProductID);
+                          onToast?.('Removed from cart.', 'success', { action: { label: 'Undo', onClick: () => cart?.addToCart(paymentPayload) } });
+                          return;
+                        }
                         cart?.addToCart(paymentPayload);
-                        onToast?.('Added to cart!');
+                        onToast?.('Added to cart!', 'success', { action: { label: 'Undo', onClick: () => cart?.removeFromCart(product.ProductID) } });
                       }}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" /></svg>
-                      {inCart ? 'In Cart' : 'Add to Cart'}
+                      {inCart ? (<><span className="cart-lbl-in">In Cart</span><span className="cart-lbl-remove">Remove from Cart</span></>) : 'Add to Cart'}
                     </button>
                   </div>
                 ) : (

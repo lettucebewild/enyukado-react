@@ -1,0 +1,153 @@
+/* Enyukado theme: white, pastel blue, pastel peach.
+   Tokens live in index.css (:root). This file holds the cross-component
+   treatments so every screen shares one look:
+   - blue  = browse / buy / primary actions
+   - peach = sell / post / highlights
+   - ink (--charcoal) for text, never pure black                              */
+
+:focus-visible { outline: 2px solid var(--blue-light); outline-offset: 2px; }
+
+/* ---------- Primary + secondary buttons (shared) ---------- */
+.btn-primary,
+.btn-modal-submit,
+.btn-buy,
+.cart-buy-btn,
+.btn-privacy-agree,
+.pp-actions .btn-buy,
+.pp-owner-edit,
+.msg-send-btn {
+  background: var(--blue-fill); color: var(--on-blue); border: 0; box-shadow: none;
+  border-radius: var(--r-pill); font-weight: 700;
+}
+.btn-primary:hover,
+.btn-modal-submit:hover,
+.btn-buy:hover,
+.cart-buy-btn:hover,
+.btn-privacy-agree:hover,
+.pp-actions .btn-buy:hover,
+.pp-owner-edit:hover,
+.msg-send-btn:hover { background: var(--blue-fill-hover); color: var(--on-blue); box-shadow: none; transform: none; }
+.btn-add-cart,
+.btn-message-seller,
+.btn-secondary-outline {
+  background: var(--white); color: var(--charcoal); border: 1px solid var(--line-2); border-radius: var(--r-pill);
+}
+.btn-add-cart:hover,
+.btn-message-seller:hover,
+.btn-secondary-outline:hover { background: var(--blue-mist); border-color: var(--blue-light); }
+.btn-add-cart.added { background: var(--peach-mist); color: var(--on-peach); border-color: var(--peach); }
+.pp-owner-edit { border: 0; }
+.pp-owner-delete { border-color: #f1c4c2; color: #b24b48; border-radius: var(--r-pill); }
+.pp-owner-buttons button { border-radius: var(--r-pill); }
+
+/* ---------- Avatars and small badges ---------- */
+.conv-avatar, .conv-search-avatar, .msg-thread-header-avatar, .msg-row-avatar,
+.pp-seller-avatar {
+  background: var(--blue-fill); color: var(--on-blue);
+}
+.conv-unread { background: var(--peach); color: var(--on-peach); }
+.img-thumb-primary { background: var(--blue-fill); color: var(--on-blue); }
+.msg-bubble-row.mine .msg-bubble { background: var(--blue-fill); color: var(--on-blue); }
+.msg-bubble-row.theirs .msg-bubble { background: var(--light); color: var(--charcoal); }
+.msg-input-wrap { background: var(--light); }
+.conv-list { background: var(--canvas); border-right-color: var(--line); }
+.conv-item.active { background: var(--blue-mist); }
+.conv-section-label { text-transform: none; letter-spacing: 0; font-size: 0.74rem; }
+
+/* ---------- Form fields ---------- */
+.input-wrap input,
+.modal-field input, .modal-field select, .modal-field textarea {
+  border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--canvas); font-size: 0.92rem;
+}
+.input-wrap input:focus,
+.modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus {
+  border-color: var(--blue-light); background: var(--white); box-shadow: 0 0 0 4px rgba(141,180,234,0.25);
+}
+.upload-zone, .proof-upload-zone { border: 1.5px dashed var(--blue-light); border-radius: var(--r-sm); background: var(--blue-mist); }
+.upload-zone:hover, .proof-upload-zone:hover { background: var(--blue-fill); }
+.upload-zone-icon { background: var(--white); border-radius: 50%; }
+
+/* ---------- Modals ---------- */
+.modal-overlay { background: rgba(38, 50, 74, 0.28); }
+.sell-modal, .payment-modal { border-radius: var(--r-lg); box-shadow: 0 24px 64px rgba(38,50,74,0.16); }
+.modal-close { background: var(--light); }
+.modal-close:hover { background: var(--blue-fill); color: var(--on-blue); }
+.payment-step.active { color: var(--on-blue); border-color: var(--blue-fill-hover); }
+.payment-method-btn { border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--white); }
+.payment-method-btn:hover { background: var(--blue-mist); border-color: var(--blue-light); }
+.payment-method-btn.selected { background: var(--blue-mist); border-color: var(--blue); }
+.payment-item-row { border: 0; background: var(--blue-mist); border-radius: var(--r-md); }
+.qr-amount, .payment-item-price { color: var(--charcoal); }
+
+/* ---------- Full-page panels (product / messages / cart / sell) ---------- */
+.fullpanel-overlay { background: var(--canvas); }
+.fullpanel-back { background: var(--light); color: var(--charcoal-2); }
+.fullpanel-back:hover { background: var(--blue-fill); color: var(--on-blue); }
+.pp-wrap { max-width: 1020px; }
+.pp-main { border-radius: var(--r-lg); background: var(--light); border: 1px solid var(--line); }
+.pp-thumb { border-radius: var(--r-sm); }
+.pp-thumb.active { border-color: var(--blue-light); }
+.pp-tag.cat { background: var(--peach); color: var(--on-peach); }
+.pp-tag.cond::before { background: var(--green); }
+.pp-tag.cond.fair::before { background: var(--orange); }
+.pp-price { color: var(--charcoal); }
+.pp-save { border-color: var(--line-2); }
+.pp-save:hover { border-color: var(--blue-light); color: var(--on-blue); }
+.pp-save.saved { background: var(--peach-mist); color: var(--on-peach); }
+.pp-facts, .pp-below, .pp-fact + .pp-fact { border-color: var(--line); }
+.pp-seller { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--white); }
+.pp-seller:hover { border-color: var(--blue-fill-hover); box-shadow: 0 12px 32px rgba(66,116,184,0.10); }
+.pp-seller-msg { background: var(--peach); color: var(--on-peach); }
+.pp-seller-msg:hover { background: var(--peach-hover); }
+.pp-more, .section-link { color: var(--blue); }
+.pp-actions .btn-buy, .pp-actions .btn-add-cart { box-shadow: none; }
+.pp-sold { background: var(--charcoal); }
+.pp-own-note { background: var(--blue-mist); border-radius: var(--r-sm); }
+.cart-item { border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: none; }
+.cart-item-price { color: var(--charcoal); }
+.cart-remove-btn:hover { border-color: #f1c4c2; color: #b24b48; }
+.cart-note { background: var(--peach-mist); color: var(--on-peach); border-radius: var(--r-sm); }
+.cart-empty-icon { opacity: 0.9; }
+
+/* ---------- Toast ---------- */
+.toast svg { color: #9fe0bd; }
+
+/* =====================================================================
+   Login / signup: pastel ground, ink text, form card in white
+   ===================================================================== */
+.intro-overlay { background: var(--login-bg); }
+.intro-overlay::before { background: rgba(255, 185, 143, 0.65); }
+.intro-overlay::after { background: rgba(86, 148, 228, 0.7); }
+.intro-icon { background: transparent; border: none; box-shadow: none; }
+.intro-name { color: var(--charcoal); }
+.intro-tagline { color: var(--charcoal-2); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; font-size: 0.75rem; }
+
+.page-wrapper .left-panel { background: var(--login-bg); }
+.page-wrapper .blob-1 { background: #ffb98f; opacity: 0.7; }
+.page-wrapper .blob-2 { background: #4f8fe3; opacity: 0.75; }
+.page-wrapper .brand-icon { background: transparent; border: none; box-shadow: none; }
+.page-wrapper .brand-name { color: var(--charcoal); }
+.page-wrapper .tagline-heading { color: var(--charcoal); }
+.page-wrapper .tagline-sub { color: var(--charcoal-2); font-weight: 400; }
+.page-wrapper .feature-icon { background: transparent; border: none; box-shadow: none; }
+.page-wrapper .feature-text h3 { color: var(--charcoal); }
+.page-wrapper .feature-text p { color: var(--charcoal-2); font-weight: 400; }
+.page-wrapper .right-panel { background: var(--canvas); }
+.page-wrapper .form-card { border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 16px 48px rgba(66,116,184,0.08); }
+.page-wrapper .form-header h2 { color: var(--charcoal); }
+.page-wrapper .form-header p { font-weight: 400; }
+.page-wrapper .btn-primary { padding: 14px 20px; }
+.page-wrapper .forgot-link,
+.page-wrapper .switch-cta a,
+.page-wrapper .legal-note a { color: var(--blue); }
+.page-wrapper .forgot-link:hover,
+.page-wrapper .switch-cta a:hover { color: var(--blue-dark); }
+
+.privacy-modal { border-radius: var(--r-lg); }
+
+/* ---------- Legal pages ---------- */
+.legal-page .legal-nav { border-bottom-color: var(--line); }
+.legal-page .legal-badge { background: var(--peach-mist); color: var(--on-peach); border-radius: var(--r-pill); }
+.legal-page .legal-title { color: var(--charcoal); letter-spacing: -0.03em; }
+.legal-page .legal-section h2::before { background: var(--peach-deep); }
+.legal-page .legal-footer { border-top-color: var(--line); }

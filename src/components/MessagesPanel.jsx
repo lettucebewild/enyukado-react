@@ -5,9 +5,12 @@ import {
   getThread,
   sendMessage,
   searchUsers,
+  sendTyping,
+  getTyping,
 } from '../api/messagesApi.js';
 import { getUser } from '../api/usersApi.js';
 import AppHeader from './AppHeader.jsx';
+import EmptyState from './EmptyState.jsx';
 import './MessagesPanel.css';
 
 const BOT_ID = 4;
@@ -44,6 +47,8 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
   const [lightbox, setLightbox] = useState(null);
   const messagesEndRef = useRef(null);
   const pollRef = useRef(null);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const lastTypingPing = useRef(0);
   const searchTimer = useRef(null);
   const textareaRef = useRef(null);
 
@@ -84,9 +89,27 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
     return () => clearInterval(pollRef.current);
   }, [activeID, loadConversations, loadThread]);
 
+  // Typing indicator: ping while I type, poll whether the other person is typing.
+  useEffect(() => {
+    setOtherTyping(false);
+    if (!activeID || !token) return undefined;
+    const id = setInterval(() => {
+      getTyping(activeID, token).then((d) => setOtherTyping(!!d?.typing)).catch(() => {});
+    }, 1500);
+    return () => clearInterval(id);
+  }, [activeID, token]);
+
+  function pingTyping() {
+    if (!activeID || !token) return;
+    const now = Date.now();
+    if (now - lastTypingPing.current < 2000) return;
+    lastTypingPing.current = now;
+    sendTyping(activeID, token).catch(() => {});
+  }
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages]);
+  }, [messages, otherTyping]);
 
   useEffect(() => {
     if (!activeID || activeID === BOT_ID) {
@@ -238,7 +261,7 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
                     className={`conv-item${activeID === c.OtherUserID ? ' active' : ''}`}
                     onClick={() => openThread(c.OtherUserID, name)}
                   >
-                    <div className="conv-avatar" style={isBot ? { background: 'linear-gradient(135deg,#326fca,#4e87d4)', fontSize: '0.9rem' } : undefined}>
+                    <div className="conv-avatar" style={isBot ? { background: 'linear-gradient(135deg,#d3e4f9,#ffe3d2)', fontSize: '0.9rem' } : undefined}>
                       {initials}
                     </div>
                     <div className="conv-info">
@@ -260,15 +283,18 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
         <div className="msg-thread">
           {!activeID ? (
             <div className="msg-thread-empty">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dde2ec" strokeWidth="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
-              <span style={{ color: 'var(--charcoal-3)', fontSize: '0.9rem' }}>Select a conversation to start messaging</span>
+              <EmptyState
+                icon="message"
+                title="No conversation selected"
+                text="Select a conversation to start messaging."
+              />
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="msg-thread-header">
                 <div
                   className="msg-thread-header-avatar"
-                  style={activeID === BOT_ID ? { background: 'linear-gradient(135deg,#326fca,#4e87d4)', cursor: 'default', fontSize: '0.85rem' } : undefined}
+                  style={activeID === BOT_ID ? { background: 'linear-gradient(135deg,#d3e4f9,#ffe3d2)', cursor: 'default', fontSize: '0.85rem' } : undefined}
                   onClick={activeID === BOT_ID ? undefined : goToProfile}
                 >
                   {activeID === BOT_ID ? '🤖' : initialsOf(activeName || '')}
@@ -305,7 +331,7 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
                           {!isMine && (
                             <div
                               className="msg-row-avatar"
-                              style={isBot ? { background: 'linear-gradient(135deg,#326fca,#4e87d4)', cursor: 'default', fontSize: '0.85rem' } : undefined}
+                              style={isBot ? { background: 'linear-gradient(135deg,#d3e4f9,#ffe3d2)', cursor: 'default', fontSize: '0.85rem' } : undefined}
                               onClick={isBot ? undefined : goToProfile}
                             >
                               {initials}
@@ -324,6 +350,12 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
                     );
                   })
                 )}
+                {otherTyping && (
+                  <div className="msg-bubble-row theirs msg-typing-row" aria-label={`${activeName || 'They'} is typing`}>
+                    <div className="msg-row-avatar" onClick={goToProfile}>{initialsOf(activeName || '')}</div>
+                    <div className="msg-bubble msg-typing"><i /><i /><i /></div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -341,7 +373,7 @@ export default function MessagesPanel({ initialUserID, initialUserName, token, m
                     placeholder="Type a message…"
                     rows={1}
                     value={input}
-                    onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
+                    onChange={(e) => { setInput(e.target.value); autoResize(e.target); if (e.target.value) pingTyping(); }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();

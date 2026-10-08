@@ -1,0 +1,145 @@
+/* ==========================================================================
+   Effects: scroll, hover, page transitions, toast, modals, hero, dark toggle.
+   Pure CSS where possible. Everything animated is wrapped in
+   prefers-reduced-motion: no-preference, so people who turn motion off in
+   their system settings get a calm static UI.
+   ========================================================================== */
+
+/* ==========================  KEYFRAMES  ================================== */
+@keyframes reveal-up    { from { opacity: 0; translate: 0 28px; scale: 0.96; } }
+@keyframes reveal-left  { from { opacity: 0; translate: -24px 0; } }
+@keyframes drift-down   { to   { translate: -30px 90px; } }
+@keyframes drift-up     { to   { translate: 40px -70px; } }
+@keyframes header-lift  { to   { box-shadow: 0 10px 30px rgba(66, 116, 184, 0.12); } }
+
+@keyframes page-in      { from { opacity: 0; } }
+@keyframes panel-in     { from { opacity: 0; translate: 0 10px; } }
+@keyframes content-in   { from { opacity: 0; translate: 0 10px; } }
+
+@keyframes word-in      { from { opacity: 0; translate: 0 16px; filter: blur(6px); } }
+@keyframes fade-up      { from { opacity: 0; translate: 0 12px; } }
+
+@keyframes overlay-in   { from { opacity: 0; } }
+@keyframes modal-in     { from { opacity: 0; translate: 0 18px; scale: 0.97; } }
+
+@keyframes badge-bump   { 0% { scale: 1; } 30% { scale: 1.7; translate: 0 -3px; } 60% { scale: 0.88; } 100% { scale: 1; translate: 0 0; } }
+@keyframes cart-wiggle  { 0%, 100% { rotate: 0deg; } 20% { rotate: -16deg; } 45% { rotate: 12deg; } 70% { rotate: -6deg; } }
+
+@keyframes save-pop     { 0% { scale: 1; rotate: 0deg; } 35% { scale: 1.5; rotate: -12deg; } 65% { scale: 0.88; rotate: 6deg; } 100% { scale: 1; rotate: 0deg; } }
+@keyframes save-ring    { from { box-shadow: 0 0 0 0 rgba(242, 162, 120, 0.55); } to { box-shadow: 0 0 0 14px rgba(242, 162, 120, 0); } }
+@keyframes heartPop     { 0% { scale: 1; } 40% { scale: 0.93; } 100% { scale: 1; } }  /* referenced in Dashboard.css but was never defined */
+
+/* ==========================  ALWAYS-ON POLISH  =========================== */
+@media (prefers-reduced-motion: no-preference) {
+
+  /* ---- Hover lift on listing cards + photo zoom ---- */
+  .listing-card { transition: border-color 0.2s, box-shadow 0.25s, translate 0.25s cubic-bezier(.2,.8,.2,1); }
+  .listing-card:hover { translate: 0 -4px; }
+  .listing-img img { transition: scale 0.5s cubic-bezier(.2,.8,.2,1); }
+  .listing-card:hover .listing-img img { scale: 1.06; }
+
+  .hero-cta, .es-btn, .btn-primary, .btn-modal-submit { transition: background 0.2s, translate 0.15s, scale 0.15s; }
+  .hero-cta:active, .es-btn:active, .btn-primary:active, .btn-modal-submit:active { scale: 0.97; }
+
+  /* ---- 1. Page transitions ----
+     Content fades in when you land on a page. The solid panel/page background
+     stays put (only the content inside fades), so the dashboard never flashes
+     through behind the Cart / Messages / Product / Sell screens. */
+  .main, .profile-main { animation: page-in 0.38s ease-out backwards; }
+  .fullpanel-body      { animation: panel-in 0.32s cubic-bezier(.2,.8,.2,1) backwards; }
+
+  /* ---- 4. Skeleton -> content fade ----
+     When loading finishes the skeletons are swapped for real cards; the cards'
+     insides fade/rise in, lightly staggered. */
+  .listing-img, .listing-info { animation: content-in 0.5s cubic-bezier(.2,.8,.2,1) backwards; }
+  .listing-card:nth-child(2) > * { animation-delay: 0.05s; }
+  .listing-card:nth-child(3) > * { animation-delay: 0.10s; }
+  .listing-card:nth-child(4) > * { animation-delay: 0.15s; }
+  .listing-card:nth-child(5) > * { animation-delay: 0.20s; }
+  .listing-card:nth-child(6) > * { animation-delay: 0.25s; }
+  .listing-card:nth-child(n+7) > * { animation-delay: 0.3s; }
+  .profile-card, .review-card, .profile-list-row { animation: content-in 0.45s cubic-bezier(.2,.8,.2,1) backwards; }
+
+  /* ---- 5. Hero heading: word-by-word entrance ---- */
+  .hero-word { display: inline-block; animation: word-in 0.75s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--i, 0) * 110ms + 150ms); }
+  .hero p        { animation: fade-up 0.7s cubic-bezier(.2,.8,.2,1) 0.55s backwards; }
+  .hero-actions  { animation: fade-up 0.7s cubic-bezier(.2,.8,.2,1) 0.7s backwards; }
+
+  /* ---- 7. Glass modals ---- */
+  .modal-overlay.open { animation: overlay-in 0.25s ease-out backwards; }
+  .modal-overlay.open > * { animation: modal-in 0.34s cubic-bezier(.2,.8,.2,1) backwards; }
+
+  /* ---- 3. Cart badge bounce + cart icon wiggle ---- */
+  .app-header-count.bump { animation: badge-bump 0.6s cubic-bezier(.34,1.56,.64,1); }
+  .app-header-link svg.cart-wiggle { animation: cart-wiggle 0.6s ease-in-out; transform-origin: 50% 70%; }
+
+  /* ---- 2. Save button pop (on saving) ---- */
+  .pp-save { position: relative; }
+  .pp-save.pop { animation: heartPop 0.45s ease-out; }
+  .pp-save.saved.pop { animation: save-ring 0.45s ease-out; }
+  .pp-save.saved.pop svg { animation: save-pop 0.45s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ---- 8. Toast: slide in from the right ---- */
+  .toast { transform: translateX(calc(100% + 40px)); transition: transform 0.5s cubic-bezier(.2,.9,.25,1.15), opacity 0.3s; }
+  .toast.show { transform: translateX(0); }
+}
+
+/* ---- 8. Toast look (static parts) ---- */
+.toast { overflow: hidden; }
+
+/* ---- 7. Modals: solid card over a plain dim (no background blur) ---- */
+.modal-overlay {
+  background: rgba(28, 40, 66, 0.30);
+}
+.modal-overlay > * {
+  background: var(--white);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 64px rgba(20, 30, 56, 0.22), inset 0 1px 0 color-mix(in srgb, var(--white) 70%, transparent);
+}
+
+/* ---- Dark mode switch in the avatar menu ---- */
+.theme-switch {
+  position: relative; margin-left: auto; flex-shrink: 0;
+  width: 34px; height: 20px; border-radius: var(--r-pill); background: var(--line-2);
+  transition: background 0.25s;
+}
+.theme-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--white); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: translate 0.25s cubic-bezier(.34,1.56,.64,1);
+}
+.theme-toggle[aria-checked="true"] .theme-switch { background: var(--blue); }
+.theme-toggle[aria-checked="true"] .theme-switch::after { translate: 14px 0; }
+
+/* ==========================  SCROLL-DRIVEN  ============================== */
+/* Chrome, Edge, Safari 26+. Other browsers just show the normal page. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+
+    /* Listing cards rise + fade in as they enter the viewport. `backwards`
+       fill hands control back afterwards, so the hover lift still works. */
+    .listing-card, .activity-item {
+      animation: reveal-up linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 45%;
+    }
+
+    /* Section titles slide in from the left. */
+    .section-header {
+      animation: reveal-left linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+
+    /* Hero circles drift at a different speed than the page (parallax). */
+    .hero-orb-1 { animation: drift-down linear both; animation-timeline: scroll(root); animation-range: 0 600px; }
+    .hero-orb-2 { animation: drift-up   linear both; animation-timeline: scroll(root); animation-range: 0 600px; }
+
+    /* Header gets a soft shadow once the page has scrolled. */
+    .app-header {
+      animation: header-lift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 90px;
+    }
+  }
+}

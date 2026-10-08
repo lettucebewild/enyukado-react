@@ -4,7 +4,6 @@
       inset: 0;
       z-index: 300;
       background: rgba(30, 40, 60, 0.55);
-      backdrop-filter: blur(6px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -20,7 +19,7 @@
 
     .privacy-modal {
       background: #ffffff;
-      border-radius: 16px;
+      border-radius: var(--r-sm);
       width: 100%;
       max-width: 520px;
       margin: 20px;
@@ -35,7 +34,8 @@
     }
 
     .privacy-modal-header {
-      background: linear-gradient(135deg, #1e3f78 0%, #326fca 100%);
+      background: var(--blue-mist);
+      border-bottom: 1px solid var(--line);
       padding: 24px 28px 20px;
       display: flex;
       align-items: center;
@@ -45,28 +45,28 @@
     .privacy-modal-header-icon {
       width: 44px;
       height: 44px;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 10px;
+      background: var(--white);
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid var(--line);
     }
 
     .privacy-modal-header h3 {
-      font-family: 'Sora', sans-serif;
+      font-family: var(--font-display);
       font-size: 1.1rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--charcoal);
       letter-spacing: -0.02em;
       margin-bottom: 2px;
     }
 
     .privacy-modal-header p {
       font-size: 0.78rem;
-      color: rgba(255, 255, 255, 0.65);
-      font-weight: 300;
+      color: var(--charcoal-2);
+      font-weight: 400;
     }
 
     .privacy-modal-body {
@@ -122,11 +122,11 @@
     .btn-privacy-agree {
       width: 100%;
       padding: 13px 20px;
-      background: #326fca;
-      color: #ffffff;
+      background: var(--blue-fill);
+      color: var(--on-blue);
       border: none;
-      border-radius: 8px;
-      font-family: 'Sora', sans-serif;
+      border-radius: var(--r-pill);
+      font-family: var(--font-body);
       font-size: 0.95rem;
       font-weight: 600;
       cursor: pointer;
@@ -135,12 +135,11 @@
       justify-content: center;
       gap: 8px;
       transition: background 0.2s, transform 0.15s;
-      box-shadow: 0 4px 16px rgba(50, 111, 202, 0.3);
+      box-shadow: none;
     }
 
     .btn-privacy-agree:hover {
-      background: #2458a8;
-      transform: translateY(-1px);
+      background: var(--blue-fill-hover);
     }
 
     .btn-privacy-cancel {
@@ -149,8 +148,8 @@
       background: transparent;
       color: #888;
       border: 1.5px solid #dde2ec;
-      border-radius: 8px;
-      font-family: 'Sora', sans-serif;
+      border-radius: var(--r-pill);
+      font-family: var(--font-body);
       font-size: 0.88rem;
       font-weight: 500;
       cursor: pointer;
@@ -166,7 +165,7 @@
     .pending-notice {
       background: rgba(245, 166, 35, 0.1);
       border: 1px solid rgba(245, 166, 35, 0.3);
-      border-radius: 8px;
+      border-radius: var(--r-xs);
       padding: 10px 14px;
       font-size: 0.82rem;
       color: #b07d10;

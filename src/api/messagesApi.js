@@ -19,3 +19,11 @@ export function sendMessage(formData, token) {
 export function searchUsers(q, token) {
   return apiClient.get(`/messages/search?q=${encodeURIComponent(q)}`, { token });
 }
+
+export function sendTyping(otherUserID, token) {
+  return apiClient.post(`/messages/typing/${otherUserID}`, {}, { token });
+}
+
+export function getTyping(otherUserID, token) {
+  return apiClient.get(`/messages/typing/${otherUserID}`, { token });
+}

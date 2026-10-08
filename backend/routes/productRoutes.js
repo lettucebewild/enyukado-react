@@ -71,9 +71,17 @@ async function withCategoryNames(products) {
     ).lean();
     const categoryMap = indexBy(categories, 'CategoryID');
 
+    // Seller photo for the avatar on listing cards
+    const sellers = await User.find(
+        { UserID: { $in: [...new Set(products.map(p => p.UserID))] } },
+        { ...NO_ID, UserID: 1, ProfileImage: 1 }
+    ).lean();
+    const sellerMap = indexBy(sellers, 'UserID');
+
     return products.map(p => sortImages({
         ...p,
-        CategoryName: categoryMap.get(p.CategoryID)?.CategoryName ?? null
+        CategoryName: categoryMap.get(p.CategoryID)?.CategoryName ?? null,
+        SellerImage:  sellerMap.get(p.UserID)?.ProfileImage ?? null
     }));
 }
 

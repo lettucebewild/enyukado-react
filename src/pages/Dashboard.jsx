@@ -13,6 +13,11 @@ import { getUnreadCount } from '../api/messagesApi.js';
 import ProductPanel from '../components/ProductPanel.jsx';
 import MessagesPanel from '../components/MessagesPanel.jsx';
 import CartPanel from '../components/CartPanel.jsx';
+import EmptyState from '../components/EmptyState.jsx';
+import SortDropdown from '../components/SortDropdown.jsx';
+import ListingCard from '../components/ListingCard.jsx';
+import CountUp from '../components/CountUp.jsx';
+import { celebrate } from '../utils/celebrate.js';
 import SellModal from '../components/SellModal.jsx';
 import PaymentModal from '../components/PaymentModal.jsx';
 import AppHeader from '../components/AppHeader.jsx';
@@ -20,8 +25,7 @@ import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
 import './Dashboard.css';
 
 // Emoji shown per category chip. Keyed by CategoryName as it comes back
-// from GET /api/categories — update this map (and the DB category names,
-// see the SQL note at the bottom of this file) if you rename categories.
+// from GET /api/categories. Update this map if you rename categories.
 const CATEGORY_EMOJI = {
   'School Supplies': '🎒',
   Gadgets: '💻',
@@ -38,6 +42,18 @@ const CATEGORY_EMOJI = {
   Services: '🎟️',
 };
 
+// Splits the hero heading into words so each can fade in one after another
+// (the delay comes from --i in effects.css).
+function HeroWords({ text }) {
+  const words = text.split(' ');
+  return words.map((w, i) => (
+    <span key={i}>
+      <span className="hero-word" style={{ '--i': i }}>{w}</span>
+      {i < words.length - 1 ? ' ' : ''}
+    </span>
+  ));
+}
+
 function timeAgo(date) {
   const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60000);
@@ -51,7 +67,12 @@ function timeAgo(date) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
+  const rrNavigate = useNavigate();
+  // Forward navigations (Browse <-> Messages / Cart / Product / Sell) use the browser's
+  // View Transitions API for a smooth cross-fade; unsupported browsers just navigate.
+  const navigate = useCallback((to, opts) => (
+    typeof to === 'number' ? rrNavigate(to) : rrNavigate(to, { viewTransition: true, ...opts })
+  ), [rrNavigate]);
   const { user, signOut } = useAuth();
   const cart = useCart();
   const location = useLocation();
@@ -70,7 +91,7 @@ export default function Dashboard() {
   const chatUserId = messagesMatch?.[1] ? parseInt(messagesMatch[1], 10) : null;
   const chatUserName = location.state?.userName || null;
   const sellEditData = location.state?.editData || null;
-  const { toast, showToast } = useToast();
+  const { toasts, showToast, dismissToast } = useToast();
 
   useEffect(() => {
     if (!user) navigate('/', { replace: true });
@@ -194,6 +215,20 @@ export default function Dashboard() {
     };
   }, [anyOverlayOpen]);
 
+  // ---- Back to top (with a scroll-progress ring) ----
+  const [scrollPct, setScrollPct] = useState(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setScrollPct(max > 0 ? Math.min(1, window.scrollY / max) : 0);
+      setShowTop(window.scrollY > 500);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  const [showTop, setShowTop] = useState(false);
+
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
@@ -238,7 +273,7 @@ export default function Dashboard() {
     try {
       if (isSaved) {
         await unsaveItem(productID, token);
-        showToast('Removed from saved items.');
+        showToast('Removed from saved items.', 'success', { action: { label: 'Undo', onClick: async () => { setSavedIds((prev) => new Set(prev).add(productID)); try { await saveItem(productID, token); } catch { /* ignore */ } } } });
       } else {
         await saveItem(productID, token);
         showToast('Saved! View in your profile → Saved tab.');
@@ -342,10 +377,14 @@ export default function Dashboard() {
         <section className="hero">
           <span className="hero-orb hero-orb-1" />
           <span className="hero-orb hero-orb-2" />
+          <div className="hero-floaters" aria-hidden="true">
+            {['🛍️', '📚', '👕', '💻', '🎨', '✏️'].map((e, i) => (
+              <span key={i} className={`hero-floater hf-${i + 1}`}>{e}</span>
+            ))}
+          </div>
           <div className="hero-content">
-            <div className="hero-eyebrow"><span /> NATIONALIANS' CAMPUS MARKETPLACE</div>
-            <h2>Welcome{user?.isFirstLogin ? '' : ' back'}{user?.firstName ? `, ${user.firstName}` : ''}.</h2>
-            <p>Find great deals from fellow students, or give your old stuff a second life.</p>
+            <h2><HeroWords text={`Welcome${user?.isFirstLogin ? '' : ' back'}${user?.firstName ? `, ${user.firstName}` : ''}.`} /></h2>
+            <p>Find great deals from fellow Nationalians, or give your old things a second life.</p>
             <div className="hero-actions">
               <div className="hero-search">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
@@ -353,7 +392,7 @@ export default function Dashboard() {
               </div>
               <button className="hero-cta" onClick={() => openSellModal(null)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                Post a listing
+                Post your first listing
               </button>
             </div>
           </div>
@@ -362,34 +401,39 @@ export default function Dashboard() {
         <div className="section-header">
           <span className="section-title">Browse listings</span>
           {Array.isArray(products) && !loadingProducts && (
-            <span className="section-count">{products.length} {products.length === 1 ? 'item' : 'items'}</span>
+            <span className="section-count"><CountUp value={products.length} duration={600} /> {products.length === 1 ? 'item' : 'items'}</span>
           )}
         </div>
 
         <div className="categories-row">
           <div className="categories">
-            <button className={`chip${!activeCategory ? ' active' : ''}`} onClick={() => setActiveCategory(null)}>
-              <span>🛍️</span> All
-            </button>
-            {sortedCategories.map((c) => (
-              <button
-                key={c.CategoryID}
-                className={`chip${String(activeCategory) === String(c.CategoryID) ? ' active' : ''}`}
-                onClick={() => setActiveCategory(c.CategoryID)}
-              >
-                <span>{CATEGORY_EMOJI[c.CategoryName] || '🏷️'}</span> {c.CategoryName}
-              </button>
-            ))}
+            <div className="categories-track">
+              <div className="chip-set">
+                <button className={`chip${!activeCategory ? ' active' : ''}`} onClick={() => setActiveCategory(null)}>
+                  <span>🛍️</span> All
+                </button>
+                {sortedCategories.map((c) => (
+                  <button
+                    key={c.CategoryID}
+                    className={`chip${String(activeCategory) === String(c.CategoryID) ? ' active' : ''}`}
+                    onClick={() => setActiveCategory(c.CategoryID)}
+                  >
+                    <span>{CATEGORY_EMOJI[c.CategoryName] || '🏷️'}</span> {c.CategoryName}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="sort-control">
-            <label htmlFor="sortSelect">Sort by:&nbsp;</label>
-            <select id="sortSelect" className="sort-select" value={activeSort} onChange={(e) => setActiveSort(e.target.value)}>
-              <option value="newest">Newest to oldest</option>
-              <option value="oldest">Oldest to newest</option>
-              <option value="price_asc">Price: Low to high</option>
-              <option value="price_desc">Price: High to low</option>
-            </select>
-          </div>
+          <SortDropdown
+            value={activeSort}
+            onChange={setActiveSort}
+            options={[
+              { value: 'newest', label: 'Newest to oldest' },
+              { value: 'oldest', label: 'Oldest to newest' },
+              { value: 'price_asc', label: 'Price: Low to high' },
+              { value: 'price_desc', label: 'Price: High to low' },
+            ]}
+          />
         </div>
 
         <div className="listings-grid">
@@ -404,51 +448,45 @@ export default function Dashboard() {
           ) : products === null ? (
             <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--red)' }}>Failed to load listings. Is the server running?</div>
           ) : products.length === 0 ? (
-            <div className="dash-empty-state">
-              <div className="empty-state-icon">🔎</div>
-              <h3>No listings found</h3>
-              <p>{activeSearch || activeCategory ? 'Try clearing your filters to see more items.' : 'Be the first to share something with your campus.'}</p>
+            <div className="dash-empty-wrap">
               {activeSearch || activeCategory ? (
-                <button className="dash-empty-action" onClick={clearFilters}>Clear filters</button>
+                <EmptyState boxed icon="search" title="No listings found" text="Try clearing your filters to see more items." actionLabel="Clear filters" actionIcon="clear" onAction={clearFilters} />
               ) : (
-                <button className="dash-empty-action" onClick={() => openSellModal(null)}>Post your first listing</button>
+                <EmptyState boxed icon="box" title="No listings yet" text="Be the first to share something with your campus." actionLabel="Post your first listing" actionIcon="plus" onAction={() => openSellModal(null)} />
               )}
             </div>
           ) : (
-            products.map((p) => {
-              const imgURL = p.images?.length ? p.images[0].ImageURL : (p.ImageURL || p.imageURL);
-              const condClass = ['Heavily used', 'Poor'].includes(p.ProductCondition) ? 'poor'
-                : ['Well used', 'Used', 'Fair'].includes(p.ProductCondition) ? 'fair' : '';
-              const liked = savedIds.has(p.ProductID);
-              return (
-                <div className="listing-card" key={p.ProductID} onClick={() => openProduct(p.ProductID)}>
-                  <div className="listing-img">
-                    {imgURL ? <img src={imgURL} alt={p.ProductName} /> : '📦'}
-                    <span className="listing-badge">{p.CategoryName || 'Others'}</span>
-                  </div>
-                  <div className="listing-info">
-                    <h4>{p.ProductName}</h4>
-                    <div className="meta">{p.sellerName || 'Student Seller'}</div>
-                    <div className="listing-foot">
-                      <div className="price">₱{parseFloat(p.Price).toLocaleString()}</div>
-                      {p.ProductCondition && <span className={`cond-pill ${condClass}`}>{p.ProductCondition}</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            products.map((p) => (
+              <ListingCard
+                key={p.ProductID}
+                product={p}
+                cart={cart}
+                myUserID={myUserID}
+                onOpen={openProduct}
+                onToast={showToast}
+                saved={savedIds.has(p.ProductID)}
+                popped={poppedHeartId === p.ProductID}
+                onToggleSave={toggleFavorite}
+              />
+            ))
           )}
         </div>
+
+        <div className="section-divider" role="separator" />
 
         <div className="section-header">
           <span className="section-title">Your activity</span>
         </div>
         <div className="activity-list">
           {activity.length === 0 ? (
-            <div className="dash-activity-empty">
-              <span>No activity yet.</span>
-              <button type="button" onClick={() => openSellModal(null)}>Post a listing</button>
-            </div>
+            <EmptyState
+              icon="activity"
+              title="No activity yet"
+              text="Your sales, purchases and messages will show up here."
+              actionLabel="Post your first listing"
+              actionIcon="plus"
+              onAction={() => openSellModal(null)}
+            />
           ) : (
             activity.map((a, i) => (
               <div className="activity-item" key={i}>
@@ -464,6 +502,21 @@ export default function Dashboard() {
       <footer className="dash-footer">
         <span>Enyukado © 2026 · Made for students, by students.</span>
       </footer>
+
+      {/* ===== BACK TO TOP ===== */}
+      <button
+        type="button"
+        className={`back-to-top${showTop && !anyOverlayOpen ? ' show' : ''}`}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="Back to top"
+        tabIndex={showTop && !anyOverlayOpen ? 0 : -1}
+      >
+        <svg className="btt-ring" viewBox="0 0 44 44" aria-hidden="true">
+          <circle className="btt-ring-bg" cx="22" cy="22" r="20" />
+          <circle className="btt-ring-fg" cx="22" cy="22" r="20" style={{ strokeDashoffset: 125.66 * (1 - scrollPct) }} />
+        </svg>
+        <svg className="btt-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
+      </button>
 
       {/* ===== FULL-PAGE VIEWS (driven by the URL) ===== */}
       {view === 'product' && (
@@ -508,7 +561,7 @@ export default function Dashboard() {
         categories={sortedCategories}
         token={token}
         editData={sellEditData}
-        onSaved={loadProducts}
+        onSaved={() => { loadProducts(); if (!sellEditData) celebrate({ label: 'Listing posted!' }); }}
         headerProps={{ ...headerProps, onBrandClick: goHome }}
         onToast={showToast}
       />
@@ -517,7 +570,7 @@ export default function Dashboard() {
         product={paymentProduct}
         token={token}
         onClose={() => setPaymentProduct(null)}
-        onSuccess={() => { loadProducts(); loadActivity(); if (paymentProduct) cart.removeFromCart(paymentProduct.productID); }}
+        onSuccess={() => { loadProducts(); loadActivity(); if (paymentProduct) cart.removeFromCart(paymentProduct.productID); celebrate({ label: 'Purchase submitted!' }); }}
         onToast={showToast}
       />
 
@@ -528,7 +581,7 @@ export default function Dashboard() {
         onToast={showToast}
       />
 
-      <Toast show={toast.show} message={toast.message} type={toast.type} />
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

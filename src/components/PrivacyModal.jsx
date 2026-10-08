@@ -11,7 +11,7 @@ export default function PrivacyModal({ open, onAgree, onCancel, submitting }) {
       <div className="privacy-modal">
         <div className="privacy-modal-header">
           <div className="privacy-modal-header-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffe7be" strokeWidth="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4274b8" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
@@ -57,11 +57,11 @@ export default function PrivacyModal({ open, onAgree, onCancel, submitting }) {
           <p>
             Your data will be retained for as long as your account remains active. Continued use
             of Enyukado constitutes acceptance of our full{' '}
-            <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: '#326fca', fontWeight: 500 }}>
+            <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: '#4274b8', fontWeight: 500 }}>
               Privacy Policy
             </a>{' '}
             and{' '}
-            <a href="/terms" target="_blank" rel="noreferrer" style={{ color: '#326fca', fontWeight: 500 }}>
+            <a href="/terms" target="_blank" rel="noreferrer" style={{ color: '#4274b8', fontWeight: 500 }}>
               Terms &amp; Conditions
             </a>
             .

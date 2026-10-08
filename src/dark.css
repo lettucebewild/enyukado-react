@@ -1,0 +1,125 @@
+/* ==========================================================================
+   Dark mode
+   Applies to the student app pages (Dashboard, Profile, Terms/Privacy), which
+   all carry html.scroll-page. Login and the admin screens keep their own look.
+   Most of the UI is driven by the colour variables, so re-defining them here
+   re-colours almost everything; the rules below fix the few hard-coded colours.
+   ========================================================================== */
+html[data-theme="dark"].scroll-page {
+  color-scheme: dark;
+
+  /* Neutral near-black (not pure black, not navy). Blue stays as the accent. */
+  --white:      #18181b;   /* card / surface */
+  --canvas:     #0f0f11;   /* page background */
+  --light:      #222226;   /* quiet fills, inputs */
+  --line:       #2b2b30;
+  --line-2:     #3a3a41;
+
+  --blue:       #7db0f5;
+  --blue-dark:  #b3d0fa;
+  --blue-light: #4a73b0;
+  --blue-fill:  #3f6db5;
+  --blue-fill-hover: #5084cf;
+  --blue-mist:  #1a2231;
+  --on-blue:    #f4f8ff;
+
+  --peach:      #4e3224;
+  --peach-hover:#63402e;
+  --peach-mist: #2b2019;
+  --peach-deep: #f7ae85;
+  --on-peach:   #ffd9c2;
+
+  /* lighter text so it pops on black */
+  --charcoal:   #f7f7fa;
+  --charcoal-2: #d4d6de;
+  --charcoal-3: #a3a7b5;
+
+  --red:        #f29995;
+  --green:      #86d6a9;
+
+  --header-bg:  rgba(15, 15, 17, 0.78);
+  --shadow:     0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  --login-bg:   linear-gradient(145deg, #131a28 0%, #1b2b49 55%, #2c231f 100%);
+}
+
+/* ---- Header: dark glass so it blends with the page ---- */
+html[data-theme="dark"].scroll-page .app-header,
+html[data-theme="dark"].scroll-page .panel-subheader { background: var(--header-bg); border-bottom-color: var(--line); }
+html[data-theme="dark"].scroll-page .app-header-brand-name { color: #fff; }
+html[data-theme="dark"].scroll-page .app-header-link { color: var(--charcoal-2); }
+html[data-theme="dark"].scroll-page .app-header-link:hover { background: var(--light); color: #fff; }
+html[data-theme="dark"].scroll-page .app-header-link.active,
+html[data-theme="dark"].scroll-page .app-header-link.within { color: #fff; }
+html[data-theme="dark"].scroll-page .app-header-sell { color: var(--on-peach); }
+
+/* ---- Hard-coded light colours -> dark ---- */
+/* borders that were #dde2ec / #c8d3e8 / #e3e8f1 / #eceff5 / #e6ebf4 */
+html[data-theme="dark"].scroll-page .modal-field input,
+html[data-theme="dark"].scroll-page .modal-field select,
+html[data-theme="dark"].scroll-page .modal-field textarea,
+html[data-theme="dark"].scroll-page .img-thumb,
+html[data-theme="dark"].scroll-page .payment-method-btn,
+html[data-theme="dark"].scroll-page .btn-secondary-outline,
+html[data-theme="dark"].scroll-page .cart-remove-btn,
+html[data-theme="dark"].scroll-page .conv-search-wrap input,
+html[data-theme="dark"].scroll-page .btn-privacy-cancel { border-color: var(--line-2); }
+html[data-theme="dark"].scroll-page .upload-zone,
+html[data-theme="dark"].scroll-page .proof-upload-zone { border-color: var(--blue-light); background: var(--blue-mist); }
+html[data-theme="dark"].scroll-page .upload-zone:hover,
+html[data-theme="dark"].scroll-page .proof-upload-zone:hover { background: #223250; }
+html[data-theme="dark"].scroll-page .pp-save { border-color: var(--line-2); }
+html[data-theme="dark"].scroll-page .pp-facts,
+html[data-theme="dark"].scroll-page .pp-fact + .pp-fact,
+html[data-theme="dark"].scroll-page .pp-below,
+html[data-theme="dark"].scroll-page .pp-seller { border-color: var(--line); }
+
+/* pale fills that were #f3f6fb / #f6f8fc / #f7f8fc / #f0f2f8 / #dde2ec */
+html[data-theme="dark"].scroll-page .pp-main,
+html[data-theme="dark"].scroll-page .pp-thumb,
+html[data-theme="dark"].scroll-page .pp-own-note,
+html[data-theme="dark"].scroll-page .conv-list,
+html[data-theme="dark"].scroll-page .msg-bubble-row.theirs .msg-bubble,
+html[data-theme="dark"].scroll-page .msg-input-wrap,
+html[data-theme="dark"].scroll-page .payment-item-img,
+html[data-theme="dark"].scroll-page .modal-close:hover,
+html[data-theme="dark"].scroll-page .fullpanel-back:hover,
+html[data-theme="dark"].scroll-page .btn-privacy-cancel:hover { background: var(--light); }
+
+/* red "danger" accents that were #fdeeee / #b24b48 / #b83232 */
+html[data-theme="dark"].scroll-page .avatar-dropdown-item.danger:hover,
+html[data-theme="dark"].scroll-page .cond-pill.poor,
+html[data-theme="dark"].scroll-page .profile-card-actions button.delete:hover { background: rgba(239,138,134,0.14); color: #ff9b97; border-color: rgba(239,138,134,0.35); }
+html[data-theme="dark"].scroll-page .pp-owner-delete { background: transparent; border-color: rgba(239,138,134,0.4); color: #ff9b97; }
+html[data-theme="dark"].scroll-page .cart-remove-btn:hover { border-color: rgba(239,138,134,0.4); color: #ff9b97; }
+
+/* green "added" state + amber notice */
+html[data-theme="dark"].scroll-page .btn-add-cart.added { color: #7fdc9b; border-color: #7fdc9b; }
+html[data-theme="dark"].scroll-page .pending-notice { color: #e6b758; }
+html[data-theme="dark"].scroll-page .pp-seller-msg:hover { background: #6b4a2a; }
+
+/* white text that sat on a (now lighter) blue fill -> dark text */
+html[data-theme="dark"].scroll-page .conv-avatar,
+html[data-theme="dark"].scroll-page .conv-search-avatar,
+html[data-theme="dark"].scroll-page .conv-unread,
+html[data-theme="dark"].scroll-page .msg-thread-header-avatar,
+html[data-theme="dark"].scroll-page .msg-row-avatar,
+html[data-theme="dark"].scroll-page .msg-send-btn,
+html[data-theme="dark"].scroll-page .msg-bubble-row.mine .msg-bubble,
+html[data-theme="dark"].scroll-page .cart-buy-btn { color: var(--white); }
+
+/* floating bits */
+html[data-theme="dark"].scroll-page .listing-badge { background: rgba(24,24,27,0.85); }
+html[data-theme="dark"].scroll-page .skeleton-shimmer::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent); }
+html[data-theme="dark"].scroll-page .modal-overlay { background: rgba(0,0,0,0.62); }
+
+/* Privacy popup was hard-coded white / grey */
+html[data-theme="dark"].scroll-page .privacy-modal { background: var(--white); }
+html[data-theme="dark"].scroll-page .privacy-modal-body p,
+html[data-theme="dark"].scroll-page .privacy-modal-body p strong,
+html[data-theme="dark"].scroll-page .privacy-points li { color: var(--charcoal-2); }
+html[data-theme="dark"].scroll-page .btn-privacy-cancel { color: var(--charcoal-3); }
+
+/* While switching themes, let colours glide instead of snapping. */
+html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+  transition: background-color 0.35s, border-color 0.35s, color 0.35s, fill 0.35s, stroke 0.35s, box-shadow 0.35s !important;
+}

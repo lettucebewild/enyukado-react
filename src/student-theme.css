@@ -38,7 +38,7 @@
   background: #d8b04b;
   content: '';
 }
-.page-wrapper .feature-icon { background: rgba(226, 190, 91, 0.13); border-color: rgba(226, 190, 91, 0.42); }
+.page-wrapper .feature-icon { background: transparent; border: none; }
 .page-wrapper .right-panel { background: #eff3f8; }
 .page-wrapper .form-card { border: 1px solid #dce4ed; border-radius: 8px; box-shadow: 0 12px 30px rgba(19, 53, 91, 0.09); }
 .page-wrapper .form-header h2 { color: #173d6b; letter-spacing: 0; }
@@ -60,8 +60,6 @@
 .app-header { border-bottom-color: #dce4ed; box-shadow: 0 2px 10px rgba(19, 53, 91, 0.035); }
 .app-header-link.active::after,
 .app-header-link.within::after { background: #c7982d; }
-.app-header-brand-icon rect { fill: #1e4e88; }
-.app-header-brand-icon path { stroke: #e5c45f; }
 .app-header-sell { border-radius: 7px; background: #1e4e88; }
 .app-header-sell:hover { background: #15395f; }
 .panel-subheader { border-bottom-color: #dce4ed; }
@@ -81,7 +79,7 @@
   box-shadow: 0 12px 28px rgba(19, 53, 91, 0.14);
 }
 .dash-body .hero-orb { display: none; }
-.hero-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #e2bd5a; font: 700 0.66rem 'Sora', sans-serif; letter-spacing: 0.12em; }
+.hero-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #e2bd5a; font: 700 0.66rem var(--font-body); letter-spacing: 0.12em; }
 .hero-eyebrow span { width: 7px; height: 7px; border-radius: 50%; background: #e2bd5a; }
 .dash-body .hero h2 { font-size: 2.15rem; letter-spacing: 0; }
 .dash-body .hero p { color: rgba(255,255,255,0.76); font-weight: 400; }

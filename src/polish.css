@@ -1,0 +1,343 @@
+/* ==========================================================================
+   Polish layer: extra effects + UI refinements. Loaded last (see main.jsx).
+   Motion is wrapped in prefers-reduced-motion: no-preference.
+   ========================================================================== */
+
+::selection { background: var(--blue-fill); color: var(--on-blue); }
+html { scroll-behavior: smooth; }
+
+/* ---- Slim themed scrollbar ---- */
+html.scroll-page { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+html.scroll-page ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.scroll-page ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: var(--r-xs); border: 2px solid var(--canvas); }
+html.scroll-page ::-webkit-scrollbar-thumb:hover { background: var(--blue-light); }
+
+/* ---- Header: tidy icons, active nav gets a soft glow ---- */
+.app-header-link.active svg, .app-header-link.within svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 55%, transparent)); }
+.app-header-sell { position: relative; overflow: hidden; }
+.app-header-sell::after {
+  content: ''; position: absolute; inset: 0; translate: -120% 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.28) 50%, transparent 70%);
+}
+.app-header-sell:hover { box-shadow: 0 6px 18px color-mix(in srgb, var(--peach-deep) 28%, transparent); }
+.app-header-sell:active { scale: 0.96; }
+
+/* ---- Hero: soft inner highlight + gradient ring on the search bar ---- */
+.hero { box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 20px 60px -30px rgba(0,0,0,0.5); }
+.hero-search { transition: border-color 0.2s, box-shadow 0.25s, background 0.2s; }
+.hero-cta:hover { box-shadow: 0 8px 22px color-mix(in srgb, var(--peach-deep) 30%, transparent); }
+
+/* ---- Category chips: lift + glow when active ---- */
+.chip { transition: background 0.2s, color 0.2s, border-color 0.2s, translate 0.2s, box-shadow 0.25s; }
+.chip:hover { translate: 0 -2px; }
+.chip.active { box-shadow: 0 6px 18px color-mix(in srgb, var(--blue-fill) 45%, transparent); }
+
+/* ---- Listing cards: glow border on hover ---- */
+.listing-card { position: relative; }
+.listing-card:hover {
+  border-color: var(--blue-light);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--blue-fill) 22%, transparent), 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* ---- Empty state: floating badge + softly breathing ring ---- */
+.empty-state-card.boxed { background: var(--white); border-color: var(--line); }
+.es-art::before, .es-art::after, .es-dot { will-change: translate; }
+
+/* ---- Focus + press feedback everywhere ---- */
+button:not(:disabled):active { scale: 0.97; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-header-sell:hover::after { translate: 120% 0; transition: translate 0.7s ease; }
+
+  @keyframes es-float { 50% { translate: 0 -6px; } }
+  @keyframes es-bob   { 50% { translate: 0 5px; } }
+  @keyframes es-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue) 35%, transparent); } 100% { box-shadow: 0 0 0 22px transparent; } }
+  .es-art-inner { animation: es-float 4s ease-in-out infinite, es-pulse 2.8s ease-out infinite; }
+  .es-art::before { animation: es-bob 3.2s ease-in-out infinite; }
+  .es-art::after  { animation: es-bob 3.8s ease-in-out infinite reverse; }
+  .es-dot-1 { animation: es-float 3.5s ease-in-out infinite; }
+  .es-dot-2 { animation: es-bob 4.2s ease-in-out infinite; }
+
+}
+
+/* ==========================================================================
+   Round 2: hero motion, back-to-top, page transitions
+   ========================================================================== */
+
+/* ---- Hero: slowly shifting gradient + floating category icons ---- */
+.hero { background-size: 180% 180%; background-position: 95% 60%; }  /* fixed: matches the peak of the old hero-shift animation */
+/* Light mode: blue-only gradient, darker on the left fading to lighter on the right */
+html:not([data-theme="dark"]) section.hero {
+  background-image: linear-gradient(100deg, #5b95de 0%, #86b4ec 40%, #bcd6f8 75%, #dbe9fb 100%);
+  background-size: 100% 100%;
+  background-position: 0 0;
+}
+/* Dark mode: same idea, darker on the left fading to a lighter navy on the right */
+html[data-theme="dark"] section.hero {
+  background-image: linear-gradient(100deg, #101826 0%, #172743 45%, #22407a 100%);
+  background-size: 100% 100%;
+  background-position: 0 0;
+}
+.hero-content { position: relative; z-index: 1; }
+.hero-floaters { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.hero-floater {
+  position: absolute; width: 54px; height: 54px; display: grid; place-items: center;
+  font-size: 1.55rem; border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+}
+.hf-1 { right: 20%; top: 14%; }
+.hf-2 { right: 9%;  top: 40%; width: 62px; height: 62px; font-size: 1.8rem; }
+.hf-3 { right: 27%; top: 52%; width: 46px; height: 46px; font-size: 1.3rem; }
+.hf-4 { right: 5%;  top: 10%; width: 46px; height: 46px; font-size: 1.3rem; }
+.hf-5 { right: 17%; top: 72%; }
+.hf-6 { right: 33%; top: 22%; width: 40px; height: 40px; font-size: 1.15rem; }
+@media (max-width: 900px) { .hero-floaters { display: none; } }
+
+/* rings + an orbiting dot living inside the hero circles */
+.hero-orb::before, .hero-orb::after { content: ''; position: absolute; border-radius: 50%; }
+.hero-orb-1::before { inset: 34px; border: 1.5px dashed rgba(255,255,255,0.28); }
+.hero-orb-1::after  { inset: 34px; background: radial-gradient(circle at 50% 0, #fff 0 5px, transparent 6px); }
+.hero-orb-2::before { inset: 22px; border: 1.5px dashed rgba(255,255,255,0.35); }
+.hero-orb-2::after  { inset: 22px; background: radial-gradient(circle at 50% 0, #fff 0 4px, transparent 5px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes hero-shift { 50% { background-position: 100% 60%; } }
+  /* .hero gradient no longer animates (it drifted back to blue) */
+
+  @keyframes spin { to { rotate: 360deg; } }
+  .hero-orb-1::before { animation: spin 50s linear infinite; }
+  .hero-orb-1::after  { animation: spin 14s linear infinite; }
+  .hero-orb-2::before { animation: spin 38s linear infinite reverse; }
+  .hero-orb-2::after  { animation: spin 9s linear infinite reverse; }
+
+  @keyframes floaty { 0%, 100% { translate: 0 0; rotate: -4deg; } 50% { translate: 0 -16px; rotate: 5deg; } }
+  .hero-floater { animation: floaty 6s ease-in-out infinite; }
+  .hf-2 { animation-duration: 7.5s; animation-delay: -1s; }
+  .hf-3 { animation-duration: 5.2s; animation-delay: -2.4s; }
+  .hf-4 { animation-duration: 6.8s; animation-delay: -3.1s; }
+  .hf-5 { animation-duration: 8s;   animation-delay: -4s; }
+  .hf-6 { animation-duration: 5.6s; animation-delay: -1.7s; }
+}
+
+/* ---- Back to top ---- */
+.back-to-top {
+  position: fixed; right: 28px; bottom: 28px; z-index: 90;
+  width: 48px; height: 48px; border-radius: 50%; border: 0; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--white); color: var(--charcoal);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+  opacity: 0; translate: 0 16px; scale: 0.85; pointer-events: none;
+  transition: opacity 0.25s, translate 0.3s cubic-bezier(.2,.8,.2,1), scale 0.3s cubic-bezier(.2,.8,.2,1), background 0.2s, color 0.2s;
+}
+.back-to-top.show { opacity: 1; translate: 0 0; scale: 1; pointer-events: auto; }
+.back-to-top:hover { background: var(--blue-fill); color: var(--on-blue); }
+.back-to-top:hover .btt-arrow { translate: 0 -2px; }
+.btt-arrow { transition: translate 0.2s; position: relative; }
+.btt-ring { position: absolute; inset: 2px; width: 44px; height: 44px; rotate: -90deg; }
+.btt-ring circle { fill: none; stroke-width: 2.5; }
+.btt-ring-bg { stroke: var(--line-2); }
+.btt-ring-fg { stroke: var(--blue); stroke-linecap: round; stroke-dasharray: 125.66; transition: stroke-dashoffset 0.15s linear; }
+.back-to-top:hover .btt-ring-fg { stroke: var(--on-blue); }
+/* keep toasts from sitting on top of the button */
+body:has(.back-to-top.show) .toast-stack { bottom: 92px; }
+
+/* ---- Smooth page transitions (Browse <-> Messages / Cart / Product / Sell) ---- */
+@keyframes vt-out { to { opacity: 0; scale: 0.985; } }
+@keyframes vt-in  { from { opacity: 0; translate: 0 14px; } }
+::view-transition-old(root) { animation: vt-out 0.22s ease both; }
+::view-transition-new(root) { animation: vt-in 0.4s cubic-bezier(.2,.8,.2,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
+/* ==========================================================================
+   Round 3: toast stack, unread pulse, typing dots, celebrate
+   ========================================================================== */
+
+/* ---- Toast stack (swipe right to dismiss) ---- */
+.toast-stack {
+  position: fixed; right: 28px; bottom: 28px; z-index: 999;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  pointer-events: none; max-width: calc(100vw - 32px);
+}
+.toast-item {
+  position: relative; overflow: hidden; pointer-events: auto; touch-action: pan-y; user-select: none;
+  display: flex; align-items: center; gap: 10px; min-width: 260px; max-width: 420px;
+  padding: 13px 12px 13px 16px; border-radius: var(--r-sm);
+  background: var(--charcoal); color: var(--white);
+  font: 500 0.88rem var(--font-body);
+  box-shadow: 0 10px 32px rgba(0,0,0,0.3);
+  translate: var(--dx, 0px) 0; opacity: var(--fade, 1);
+  cursor: grab;
+}
+.toast-item.dragging { cursor: grabbing; }
+.toast-item:not(.dragging) { transition: translate 0.25s cubic-bezier(.2,.8,.2,1), opacity 0.25s; }
+.toast-icon { flex-shrink: 0; }
+.toast-msg { flex: 1; line-height: 1.35; }
+.toast-action {
+  flex-shrink: 0; border: 0; background: transparent; cursor: pointer;
+  color: var(--blue-fill); font: 700 0.84rem var(--font-display); padding: 4px 8px; border-radius: var(--r-xs);
+}
+.toast-action:hover { background: rgba(0,0,0,0.08); }
+.toast-close {
+  flex-shrink: 0; width: 24px; height: 24px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: transparent; color: inherit; opacity: 0.55; cursor: pointer;
+}
+.toast-close:hover { opacity: 1; background: rgba(0,0,0,0.1); }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes toast-in  { from { opacity: 0; translate: 60px 0; scale: 0.96; } }
+  @keyframes toast-out { to   { opacity: 0; translate: 80px 0; } }
+  .toast-item { animation: toast-in 0.4s cubic-bezier(.2,.9,.25,1.1) backwards; }
+  .toast-item.leaving { animation: toast-out 0.28s ease forwards; }
+}
+.toast-item.leaving { pointer-events: none; }
+@media (max-width: 560px) { .toast-stack { right: 12px; left: 12px; align-items: stretch; } .toast-item { max-width: none; } }
+
+/* ---- Unread badge pulse ---- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes unread-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--peach-deep) 70%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+  .app-header-count.unread-pulse { animation: unread-ring 1.8s ease-out infinite; }
+  .conv-unread { animation: unread-ring 1.8s ease-out infinite; }
+}
+
+/* ---- Typing indicator ---- */
+.msg-typing { display: inline-flex; align-items: center; gap: 4px; padding: 13px 16px; }
+.msg-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--charcoal-3); opacity: 0.5; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes typing-bounce { 0%, 60%, 100% { translate: 0 0; opacity: 0.4; } 30% { translate: 0 -5px; opacity: 1; } }
+  .msg-typing i { animation: typing-bounce 1.1s ease-in-out infinite; }
+  .msg-typing i:nth-child(2) { animation-delay: 0.15s; }
+  .msg-typing i:nth-child(3) { animation-delay: 0.3s; }
+  .msg-typing-row { animation: fade-up 0.25s ease backwards; }
+}
+
+/* ---- Celebrate: confetti canvas + animated check badge ---- */
+.celebrate-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 1000; pointer-events: none; }
+.celebrate-badge {
+  position: fixed; left: 50%; top: 42%; z-index: 1001; translate: -50% -50%;
+  display: flex; flex-direction: column; align-items: center; gap: 12px; pointer-events: none;
+  padding: 26px 34px 22px; border-radius: var(--r-md); background: var(--white); color: var(--charcoal);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.35); font: 700 1rem var(--font-display);
+  animation: cb-pop 0.45s cubic-bezier(.34,1.56,.64,1) backwards;
+  transition: opacity 0.35s, scale 0.35s;
+}
+.celebrate-badge:not(:has(span)) { padding: 22px; border-radius: 50%; }
+.celebrate-badge.out { opacity: 0; scale: 0.9; }
+.celebrate-badge svg { width: 68px; height: 68px; }
+.cb-circle { fill: color-mix(in srgb, var(--green, #5fbf8a) 18%, transparent); stroke: var(--green, #5fbf8a); stroke-width: 3; stroke-dasharray: 145; stroke-dashoffset: 145; animation: cb-draw 0.55s ease 0.1s forwards; }
+.cb-check  { fill: none; stroke: var(--green, #5fbf8a); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: cb-draw 0.4s ease 0.55s forwards; }
+@keyframes cb-draw { to { stroke-dashoffset: 0; } }
+@keyframes cb-pop  { from { opacity: 0; scale: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .cb-circle, .cb-check { animation: none; stroke-dashoffset: 0; } .celebrate-badge { animation: none; } }
+
+/* ==========================================================================
+   Round 4: section divider, layered shadows, hero grain + heading glow
+   ========================================================================== */
+
+/* ---- Section divider: plain grey line ---- */
+.section-divider { height: 1px; margin: -24px 0 44px; background: var(--line-2); }
+
+/* ---- Layered, softer shadows (light mode). Dark mode keeps its glow. ---- */
+:root {
+  --shadow-sm: 0 1px 2px rgba(31,45,80,0.05), 0 2px 6px rgba(31,45,80,0.04);
+  --shadow-md: 0 1px 2px rgba(31,45,80,0.05), 0 4px 10px rgba(31,45,80,0.06), 0 12px 24px rgba(31,45,80,0.06);
+  --shadow-lg: 0 2px 4px rgba(31,45,80,0.05), 0 8px 16px rgba(31,45,80,0.07), 0 20px 40px rgba(66,116,184,0.12), 0 40px 80px rgba(66,116,184,0.08);
+}
+html:not([data-theme="dark"]) :is(.listing-card, .activity-item, .cart-item, .pp-seller, .empty-state-card.boxed, .profile-card, .review-card, .sd-trigger, .hero-search) {
+  box-shadow: var(--shadow-sm);
+}
+html:not([data-theme="dark"]) .listing-card { border-color: color-mix(in srgb, var(--line) 70%, transparent); transition: box-shadow 0.3s, border-color 0.2s, translate 0.25s cubic-bezier(.2,.8,.2,1); }
+html:not([data-theme="dark"]) .listing-card:hover { box-shadow: var(--shadow-lg); border-color: var(--line-2); }
+html:not([data-theme="dark"]) :is(.pp-seller:hover, .cart-item:hover, .activity-item:hover) { box-shadow: var(--shadow-md); }
+html:not([data-theme="dark"]) .hero { box-shadow: var(--shadow-lg); }
+html:not([data-theme="dark"]) .app-header { box-shadow: 0 1px 0 var(--line), 0 6px 20px rgba(31,45,80,0.04); }
+html:not([data-theme="dark"]) .sd-menu { box-shadow: var(--shadow-lg); }
+html:not([data-theme="dark"]) .toast-item { box-shadow: var(--shadow-lg); }
+html:not([data-theme="dark"]) .listing-badge { box-shadow: 0 1px 2px rgba(31,45,80,0.08), 0 4px 10px rgba(31,45,80,0.06); }
+
+/* ---- Hero: film grain over the gradient ---- */
+.hero::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeColorMatrix values='1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  mix-blend-mode: overlay; opacity: 0.38;
+}
+html[data-theme="dark"] .hero::after { opacity: 0.55; }
+
+/* ---- Hero: soft glow behind the heading so the text pops ---- */
+:root { --hero-glow: rgba(255,255,255,0.9); --hero-text-glow: 0 0 28px rgba(255,255,255,0.95), 0 2px 12px rgba(255,255,255,0.8); }
+html[data-theme="dark"] { --hero-glow: rgba(125,176,245,0.30); --hero-text-glow: 0 2px 30px rgba(125,176,245,0.45), 0 1px 3px rgba(0,0,0,0.4); }
+.hero-content::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  left: -70px; top: -50px; width: 560px; height: 240px;
+  background: radial-gradient(closest-side, var(--hero-glow), transparent 100%);
+  filter: blur(14px);
+}
+.hero h2 { text-shadow: var(--hero-text-glow); }
+html[data-theme="dark"] .hero h2 { color: #fff; }
+html[data-theme="dark"] .hero p { color: var(--charcoal-2); text-shadow: 0 1px 12px rgba(0,0,0,0.35); }
+@media (max-width: 700px) { .hero-content::before { width: 100%; left: -30px; } }
+
+
+/* ============================================================
+   Hero: compact box (matches the size you liked) + 48px search / Post button
+   ============================================================ */
+.hero { padding: 48px 52px 40px; }
+.hero-content { max-width: 670px; }
+.hero h2 { margin-bottom: 10px; }
+.hero p { margin-bottom: 20px; }
+.hero-search { height: 48px; min-width: 240px; padding: 0 20px; }
+.hero-cta { height: 48px; padding: 0 24px; font-size: 0.95rem; }
+
+
+/* Listing photos: show the whole photo (no cropping); white behind it so white-background photos blend in */
+html:not([data-theme="dark"]) .listing-img { background: #fff; }
+.listing-img img { object-fit: contain; }
+
+/* Product page: show the whole photo instead of cropping it */
+html:not([data-theme="dark"]) .pp-main { background: #fff; }
+.pp-main img { object-fit: contain; }
+
+/* ============================================================
+   Product page: put everything in boxes
+   ============================================================ */
+.pp-top,
+.pp-below {
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 28px; box-shadow: var(--shadow);
+}
+.pp-below { margin-top: 24px; border-top: 1px solid var(--line); }
+.pp-top.has-thumbs { margin-bottom: 0; }
+@media (min-width: 701px) {
+  /* thumbnails sit under the photo, so keep them inside the box */
+  .pp-top.has-thumbs { padding-bottom: 96px; }
+}
+
+/* photo: soft frame */
+.pp-main { border-radius: var(--r-md); border: 1px solid var(--line); }
+
+/* quick facts become a tinted panel */
+.pp-facts {
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--canvas);
+  padding: 14px 18px; margin-top: 20px; margin-bottom: 22px;
+}
+
+/* price: bigger and bolder */
+.pp-price { font-size: 2rem; font-weight: 700; }
+
+/* seller card sits quietly inside its box */
+.pp-seller { background: var(--canvas); }
+
+/* ============================================================
+   All-white page background (light mode), same as the header
+   ============================================================ */
+html:not([data-theme="dark"]).scroll-page,
+html:not([data-theme="dark"]) body.scroll-page,
+html:not([data-theme="dark"]) .dash-body,
+html:not([data-theme="dark"]) .fullpanel-overlay,
+html:not([data-theme="dark"]) .profile-page,
+html:not([data-theme="dark"]) .main,
+html:not([data-theme="dark"]) .profile-main { background: #fff; }
+html:not([data-theme="dark"]) .app-header,
+html:not([data-theme="dark"]) .panel-subheader { background: #fff; }

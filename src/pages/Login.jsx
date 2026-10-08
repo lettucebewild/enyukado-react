@@ -12,6 +12,7 @@ import { useToast } from '../hooks/useToast.js';
 import Toast from '../components/Toast.jsx';
 import PrivacyModal from '../components/PrivacyModal.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
+import BrandLogo from '../components/BrandLogo.jsx';
 import './Login.css';
 
 const ALLOWED_DOMAIN = '@students.national-u.edu.ph';
@@ -22,7 +23,7 @@ const NAME_REGEX = /^[a-zA-Z\s\-']+$/;
 export default function Login() {
   const navigate = useNavigate();
   const { user, signIn } = useAuth();
-  const { toast, showToast } = useToast();
+  const { toasts, showToast, dismissToast } = useToast();
 
   // ---- intro overlay (runs once, mirrors the old window.addEventListener('load', ...)) ----
   const [introDone, setIntroDone] = useState(false);
@@ -293,18 +294,7 @@ export default function Login() {
         <div className={`intro-overlay${fadeOut ? ' fade-out' : ''}`} style={{ display: 'flex' }}>
           <div className={`intro-brand${brandIn ? ' brand-in' : ''}${brandOut ? ' brand-out' : ''}`}>
             <div className="intro-icon">
-              <svg width="40" height="40" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="32" height="32" rx="8" fill="rgba(255,255,255,0.15)" />
-                <path
-                  d="M7 8h2l2.5 9h8l2-6H11"
-                  stroke="#ffe7be"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="13.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-                <circle cx="19.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-              </svg>
+              <BrandLogo size={30} />
             </div>
             <span className="intro-name">Enyukado</span>
           </div>
@@ -320,18 +310,7 @@ export default function Login() {
           <div className="left-inner">
             <div className="brand">
               <div className="brand-icon">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="32" height="32" rx="8" fill="#326fca" />
-                  <path
-                    d="M7 8h2l2.5 9h8l2-6H11"
-                    stroke="#ffe7be"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <circle cx="13.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-                  <circle cx="19.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-                </svg>
+                <BrandLogo size={26} />
               </div>
               <span className="brand-name">Enyukado</span>
             </div>
@@ -699,7 +678,7 @@ export default function Login() {
         submitting={signupSubmitting}
       />
 
-      <Toast show={toast.show} message={toast.message} type={toast.type} />
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </>
   );
 }

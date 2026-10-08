@@ -1,0 +1,120 @@
+/* Post / update listing page — two-card layout (details + photos).
+   All classes are prefixed sl- so they don't collide with the shared modal styles. */
+
+.sl-page { max-width: 1040px; margin: 0 auto; padding: 28px 24px 56px; }
+
+.sl-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; }
+
+/* ---------- single box ---------- */
+.sl-box { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.sl-col { padding: 26px; min-width: 0; }
+.sl-col + .sl-col { border-left: 1px solid var(--line); }
+.sl-card-photos { display: flex; flex-direction: column; }
+.sl-card-photos .sl-drop { flex: 1; min-height: 220px; }
+.sl-card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.sl-card-head h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; color: var(--charcoal); }
+.sl-card-head p { margin: 2px 0 0; font-size: 0.82rem; color: var(--charcoal-3); }
+.sl-count { margin-left: auto; font-size: 0.78rem; font-weight: 600; color: var(--on-peach); background: var(--peach-mist); padding: 4px 10px; border-radius: var(--r-pill); }
+
+/* ---------- fields ---------- */
+.sl-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+.sl-field label { font-size: 0.85rem; font-weight: 600; color: var(--charcoal-2); }
+.sl-field label em { font-style: normal; font-weight: 400; color: var(--charcoal-3); }
+.sl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.sl-field input, .sl-field select, .sl-field textarea {
+  width: 100%; box-sizing: border-box; padding: 12px 14px; font-family: var(--font-body); font-size: 0.93rem; color: var(--charcoal);
+  background: var(--canvas); border: 1.5px solid var(--line-2); border-radius: var(--r-sm); outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.sl-field input:hover, .sl-field select:hover, .sl-field textarea:hover { border-color: var(--blue-light); }
+.sl-field input:focus, .sl-field select:focus, .sl-field textarea:focus {
+  border-color: var(--blue-light); background: var(--white); box-shadow: 0 0 0 4px rgba(141,180,234,0.25);
+}
+.sl-field textarea { min-height: 130px; resize: vertical; line-height: 1.6; }
+.sl-counter { align-self: flex-end; font-size: 0.74rem; color: var(--charcoal-3); }
+
+.sl-input-prefix { position: relative; }
+.sl-input-prefix span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--blue); pointer-events: none; }
+.sl-input-prefix input { padding-left: 32px; font-weight: 600; }
+
+.sl-stepper { display: flex; align-items: stretch; border: 1.5px solid var(--line-2); border-radius: var(--r-sm); background: var(--canvas); overflow: hidden; }
+.sl-stepper input { border: 0 !important; box-shadow: none !important; background: transparent !important; text-align: center; padding: 12px 0; font-weight: 600; -moz-appearance: textfield; appearance: textfield; min-width: 0; }
+.sl-stepper input::-webkit-outer-spin-button, .sl-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.sl-stepper button { width: 44px; border: 0; background: transparent; font-size: 1.15rem; font-weight: 600; color: var(--blue); cursor: pointer; transition: background 0.15s; }
+.sl-stepper button:hover:not(:disabled) { background: var(--blue-mist); }
+.sl-stepper button:disabled { color: var(--charcoal-3); opacity: 0.5; cursor: not-allowed; }
+
+/* condition chips */
+.sl-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.sl-chip {
+  padding: 8px 14px; border-radius: var(--r-pill); border: 1.5px solid var(--line-2); background: var(--white);
+  font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; color: var(--charcoal-2); cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+.sl-chip:hover { border-color: var(--blue-light); background: var(--blue-mist); }
+.sl-chip:active { transform: scale(0.96); }
+.sl-chip.active { background: var(--blue-fill); border-color: var(--blue-fill); color: var(--on-blue); font-weight: 700; }
+
+/* ---------- photos ---------- */
+.sl-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.sl-photo { position: relative; aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden; background: var(--light); border: 1.5px solid var(--line-2); }
+.sl-photo.is-cover { border: 2.5px solid var(--blue); }
+.sl-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sl-photo-main { position: absolute; left: 8px; top: 8px; background: var(--blue-fill); color: var(--on-blue); font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: var(--r-pill); }
+.sl-photo-remove {
+  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(38,50,74,0.72); color: #fff; font-size: 0.7rem; display: grid; place-items: center; transition: background 0.15s, transform 0.15s;
+}
+.sl-photo-remove:hover { background: var(--red); transform: scale(1.1); }
+
+.sl-drop {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 40px 20px; border: 2px dashed var(--blue-light); border-radius: var(--r-md);
+  background: linear-gradient(160deg, var(--blue-mist) 0%, var(--peach-mist) 100%);
+  cursor: pointer; transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.sl-drop.compact { padding: 20px; }
+.sl-drop:hover { border-color: var(--blue); box-shadow: 0 8px 24px rgba(66,116,184,0.12); }
+.sl-drop.dragging { border-color: var(--blue); border-style: solid; transform: scale(1.015); box-shadow: 0 0 0 5px rgba(141,180,234,0.3); }
+.sl-drop input[type="file"] { display: none; }
+.sl-drop-icon {
+  width: 56px; height: 56px; border-radius: 50%; background: var(--white); color: var(--blue); display: grid; place-items: center;
+  margin-bottom: 12px; box-shadow: 0 4px 14px rgba(66,116,184,0.18); transition: transform 0.25s;
+}
+.sl-drop:hover .sl-drop-icon, .sl-drop.dragging .sl-drop-icon { transform: translateY(-4px); }
+.sl-drop.compact .sl-drop-icon { width: 40px; height: 40px; margin-bottom: 8px; }
+.sl-drop-title { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--charcoal); margin-bottom: 4px; }
+.sl-drop-sub { font-size: 0.78rem; color: var(--charcoal-2); }
+
+.sl-tips { list-style: none; margin: 18px 0 0; padding: 14px 16px; background: var(--peach-mist); border-radius: var(--r-sm); display: grid; gap: 6px; }
+.sl-tips li { font-size: 0.8rem; color: var(--on-peach); padding-left: 20px; position: relative; }
+.sl-tips li::before { content: '✦'; position: absolute; left: 0; color: var(--peach-deep); }
+
+/* ---------- submit row (inside the box) ---------- */
+.sl-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 18px 26px; border-top: 1px solid var(--line); background: var(--canvas);
+}
+.sl-submit {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 220px; padding: 13px 28px;
+  background: var(--blue-fill); color: var(--on-blue); border: 0; border-radius: var(--r-pill);
+  font-family: var(--font-body); font-size: 0.98rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(66,116,184,0.25); transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+.sl-submit:hover:not(:disabled) { background: var(--blue-fill-hover); transform: translateY(-1px); box-shadow: 0 10px 24px rgba(66,116,184,0.32); }
+.sl-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 860px) {
+  .sl-grid { grid-template-columns: 1fr; }
+  .sl-col + .sl-col { border-left: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 480px) {
+  .sl-page { padding: 16px 14px 40px; }
+  .sl-box { border-radius: var(--r-md); }
+  .sl-col { padding: 20px 16px; }
+  .sl-row { grid-template-columns: 1fr; gap: 0; }
+  .sl-actions { padding: 14px 16px; }
+  .sl-submit { width: 100%; }
+}

@@ -4,6 +4,7 @@ import * as api from '../api/adminApi.js';
 import { useToast } from '../hooks/useToast.js';
 import Toast from '../components/Toast.jsx';
 import './AdminDashboard.css';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 const ic = (d) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
@@ -68,7 +69,7 @@ function describe(tab, r) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { toast, showToast } = useToast();
+  const { toasts, showToast, dismissToast } = useToast();
   const session = api.getAdminSession();
 
   const [tab, setTab] = useState('accounts');
@@ -189,12 +190,7 @@ export default function AdminDashboard() {
     <div className="admin-page">
       <aside className="admin-side">
         <div className="admin-brand">
-          <svg width="34" height="34" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="#326fca" />
-            <path d="M7 8h2l2.5 9h8l2-6H11" stroke="#ffe7be" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="13.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-            <circle cx="19.5" cy="21.5" r="1.5" fill="#f4f5f7" />
-          </svg>
+          <BrandLogo size={26} stroke="#8fbbee" />
           <span className="admin-brand-name">Enyukado</span>
           <span className="admin-brand-tag">Admin</span>
         </div>
@@ -474,7 +470,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <Toast show={toast.show} message={toast.message} type={toast.type} />
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

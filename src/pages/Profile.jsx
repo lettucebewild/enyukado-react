@@ -7,11 +7,12 @@ import Toast from '../components/Toast.jsx';
 import AppHeader from '../components/AppHeader.jsx';
 import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
 import EditProfileModal from '../components/EditProfileModal.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import { getUser } from '../api/usersApi.js';
 import { getReviewsForUser } from '../api/reviewsApi.js';
 import { deleteProduct, getMyListings, getProducts } from '../api/productsApi.js';
 import { getMyPurchases } from '../api/transactionsApi.js';
-import { getSavedItems, unsaveItem } from '../api/savedApi.js';
+import { getSavedItems, saveItem, unsaveItem } from '../api/savedApi.js';
 import { uploadProfilePhoto } from '../api/usersApi.js';
 import { getUnreadCount } from '../api/messagesApi.js';
 import '../pages/Dashboard.css';
@@ -80,7 +81,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user, signOut, updateUser } = useAuth();
   const cart = useCart();
-  const { toast, showToast } = useToast();
+  const { toasts, showToast, dismissToast } = useToast();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -247,9 +248,9 @@ export default function Profile() {
 
   const tags = useMemo(() => {
     const t = [];
-    if (profile?.Course) t.push({ icon: '🎓', label: profile.Course });
-    if (profile?.Year) t.push({ icon: '📚', label: profile.Year });
-    if (profile?.CampusArea) t.push({ icon: '📍', label: profile.CampusArea });
+    if (profile?.Course) t.push({ label: profile.Course });
+    if (profile?.Year) t.push({ label: profile.Year });
+    if (profile?.CampusArea) t.push({ label: profile.CampusArea });
     return t;
   }, [profile]);
 
@@ -271,14 +272,14 @@ export default function Profile() {
 
   const tabs = isOwn
     ? [
-        { id: 'listings', label: 'Listings', icon: '📦', count: listings.length },
-        { id: 'purchases', label: 'Purchases', icon: '🛍️', count: purchases.length },
-        { id: 'saved', label: 'Saved', icon: '❤️', count: saved.length },
-        { id: 'reviews', label: 'Reviews', icon: '⭐', count: reviews.length },
+        { id: 'listings', label: 'Listings', count: listings.length },
+        { id: 'purchases', label: 'Purchases', count: purchases.length },
+        { id: 'saved', label: 'Saved', count: saved.length },
+        { id: 'reviews', label: 'Reviews', count: reviews.length },
       ]
     : [
-        { id: 'listings', label: 'Listings', icon: '📦', count: listings.length },
-        { id: 'reviews', label: 'Reviews', icon: '⭐', count: reviews.length },
+        { id: 'listings', label: 'Listings', count: listings.length },
+        { id: 'reviews', label: 'Reviews', count: reviews.length },
       ];
 
   function handleLogout() {
@@ -325,10 +326,21 @@ export default function Profile() {
   }
 
   async function handleUnsave(productID) {
+    const removed = saved.find((item) => item.ProductID === productID);
     try {
       await unsaveItem(productID, token);
       setSaved((current) => current.filter((item) => item.ProductID !== productID));
-      showToast('Removed from saved items.');
+      showToast('Removed from saved items.', 'success', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await saveItem(productID, token);
+              if (removed) setSaved((current) => (current.some((i) => i.ProductID === productID) ? current : [removed, ...current]));
+            } catch { /* ignore */ }
+          },
+        },
+      });
     } catch (err) {
       showToast(err.message || 'Failed to remove saved item.', 'error');
     }
@@ -383,10 +395,7 @@ export default function Profile() {
           <>
             {/* ===== PROFILE HEADER ===== */}
             <div className="profile-header">
-              <div className="profile-banner">
-                <span className="profile-banner-label">CAMPUS MARKETPLACE</span>
-                <span className="profile-banner-stamp">STUDENT PROFILE</span>
-              </div>
+              <div className="profile-banner" aria-hidden="true" />
               <div className="profile-body">
                 <div className="profile-identity">
                   <div className="profile-avatar">
@@ -408,16 +417,12 @@ export default function Profile() {
                     )}
                   </div>
                   <div className="profile-identity-copy">
-                    <div className="profile-kicker">
-                      <span className="profile-kicker-mark" />
-                      {isOwn ? 'YOUR CAMPUS PROFILE' : 'CAMPUS MEMBER'}
-                    </div>
                     <h1 className="profile-name">{profile.FirstName} {profile.LastName}</h1>
                     {memberSince && <div className="profile-handle"><span className="profile-member-dot" />Member since {memberSince}</div>}
                     {profile.Bio && <div className="profile-bio">{profile.Bio}</div>}
                     <div className="profile-tags">
                       {tags.map((t, i) => (
-                        <span className="profile-tag" key={i}>{t.icon} {t.label}</span>
+                        <span className="profile-tag" key={i}>{t.label}</span>
                       ))}
                     </div>
                   </div>
@@ -425,7 +430,7 @@ export default function Profile() {
                     <div className="profile-avatar-actions">
                       <button className="btn-edit-profile" onClick={() => setEditOpen(true)}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                        Edit Profile
+                        Edit profile
                       </button>
                     </div>
                   )}
@@ -449,7 +454,7 @@ export default function Profile() {
                       className={`tab${tab === t.id ? ' active' : ''}`}
                       onClick={() => setTab(t.id)}
                     >
-                      {t.icon} {t.label}
+                      {t.label}
                       {t.count !== null && <span className="tab-count">{t.count}</span>}
                     </button>
                   ))}
@@ -459,12 +464,15 @@ export default function Profile() {
                   tab === 'purchases' ? <ProfilePurchasesSkeleton /> : <ProfileGridSkeleton />
                 ) : tab === 'listings' ? (
                   listings.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">📦</div>
-                      <h4>No listings yet</h4>
-                      <p>{isOwn ? 'Post something you no longer need!' : 'No listings from this seller yet.'}</p>
-                      {isOwn && <button className="empty-state-action" onClick={() => openSellModal(null)}>Post your first listing</button>}
-                    </div>
+                    <EmptyState
+                      boxed
+                      icon="box"
+                      title="No listings yet"
+                      text={isOwn ? 'Post something you no longer need!' : 'No listings from this seller yet.'}
+                      actionLabel={isOwn ? 'Post your first listing' : undefined}
+                      actionIcon="plus"
+                      onAction={() => openSellModal(null)}
+                    />
                   ) : (
                     <div className="profile-grid">
                       {listings.map((p) => {
@@ -492,12 +500,15 @@ export default function Profile() {
                   )
                 ) : tab === 'purchases' ? (
                   purchases.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">🛍️</div>
-                      <h4>No purchases yet</h4>
-                      <p>Items you buy will appear here.</p>
-                      <button className="empty-state-action" onClick={() => navigate('/dashboard')}>Browse marketplace</button>
-                    </div>
+                    <EmptyState
+                      boxed
+                      icon="bag"
+                      title="No purchases yet"
+                      text="Items you buy will appear here."
+                      actionLabel="Browse marketplace"
+                      actionIcon="search"
+                      onAction={() => navigate('/dashboard')}
+                    />
                   ) : (
                     <div className="profile-list">
                       {purchases.map((t) => (
@@ -516,12 +527,15 @@ export default function Profile() {
                   )
                 ) : tab === 'saved' ? (
                   saved.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">🤍</div>
-                      <h4>Nothing saved yet</h4>
-                      <p>Heart items on the marketplace to save them here.</p>
-                      <button className="empty-state-action" onClick={() => navigate('/dashboard')}>Browse marketplace</button>
-                    </div>
+                    <EmptyState
+                      boxed
+                      icon="heart"
+                      title="Nothing saved yet"
+                      text="Heart items on the marketplace to save them here."
+                      actionLabel="Browse marketplace"
+                      actionIcon="search"
+                      onAction={() => navigate('/dashboard')}
+                    />
                   ) : (
                     <div className="profile-grid">
                       {saved.map((p) => {
@@ -548,12 +562,15 @@ export default function Profile() {
                   )
                 ) : tab === 'reviews' ? (
                   reviews.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">⭐</div>
-                      <h4>No reviews yet</h4>
-                      <p>Reviews from buyers will appear here.</p>
-                      <button className="empty-state-action" onClick={() => navigate('/dashboard')}>Browse marketplace</button>
-                    </div>
+                    <EmptyState
+                      boxed
+                      icon="star"
+                      title="No reviews yet"
+                      text="Reviews from buyers will appear here."
+                      actionLabel="Browse marketplace"
+                      actionIcon="search"
+                      onAction={() => navigate('/dashboard')}
+                    />
                   ) : (
                     <div className="reviews-list">
                       {reviews.map((r) => {
@@ -583,7 +600,7 @@ export default function Profile() {
               <aside className="profile-sidebar" aria-label="Seller rating summary">
                 <div className="rating-card">
                   <div className="rating-card-heading">
-                    <span>SELLER REPUTATION</span>
+                    <span>{isOwn ? 'Your rating' : 'Seller rating'}</span>
                     <span className="rating-card-mark">★</span>
                   </div>
                   <div className="rating-big">
@@ -622,7 +639,7 @@ export default function Profile() {
         onToast={showToast}
       />
 
-      <Toast show={toast.show} message={toast.message} type={toast.type} />
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

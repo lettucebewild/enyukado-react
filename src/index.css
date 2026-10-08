@@ -1,3 +1,8 @@
+/* Buttons/inputs don't inherit the page font by default (the browser uses its
+   own system font), which is why the header brand <button> wasn't Sora. */
+button, input, select, textarea { font-family: inherit; }
+h1, h2, h3 { font-family: var(--font-display); }
+
 *, *::before, *::after {
   margin: 0;
   padding: 0;
@@ -5,25 +10,58 @@
 }
 
 :root {
-  --blue:       #326fca;
-  --blue-dark:  #2458a8;
-  --blue-light: #4e87d4;
-  --peach:      #ffe7be;
-  --light:      #f4f5f7;
-  --charcoal:   #3c3c3c;
-  --charcoal-2: #5a5a5a;
-  --charcoal-3: #888;
+  /* Type pairing: Sora for titles/big numbers, DM Sans for everything else. */
+  --font-display: 'Sora', system-ui, sans-serif;
+  --font-body:    'DM Sans', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+
+  /* Pastel palette: white, sky blue, peach. */
   --white:      #ffffff;
-  --radius:     14px;
-  --radius-sm:  8px;
-  --shadow:     0 4px 24px rgba(50, 111, 202, 0.12);
+  --canvas:     #f8fafd;      /* page background */
+  --light:      #f1f5fb;      /* quiet fills, inputs */
+  --line:       #e7edf6;      /* hairlines */
+  --line-2:     #d8e2f0;
+
+  --blue:       #4274b8;      /* blue used as text / icon / link (readable) */
+  --blue-dark:  #2f5a99;
+  --blue-light: #8db4ea;
+  --blue-fill:  #8fbbee;      /* light blue surfaces + primary buttons (more pop) */
+  --blue-fill-hover: #78aae6;
+  --blue-mist:  #d3e4f8;
+  --on-blue:    #12294d;      /* text that sits on pastel blue */
+
+  --peach:      #ffe3d2;      /* pastel peach surfaces + sell actions */
+  --peach-hover:#ffd5bd;
+  --peach-mist: #fff3ea;
+  --peach-deep: #f2a278;      /* stars, bars */
+  --on-peach:   #8a4524;
+
+  --charcoal:   #26324a;      /* main text (soft navy ink) */
+  --charcoal-2: #55637d;
+  --charcoal-3: #8491a8;
+
+  --green:      #6fb58f;
+  --red:        #d96a66;
+  --orange:     #f2a278;
+
+  /* Corner radius scale. Use these instead of raw px values so every card, panel and
+     button belongs to one of a few shapes. Nested corners: inner = outer - padding
+     (e.g. a card of --r-md with 8px padding holds an image of --r-sm). */
+  --r-xs:   8px;     /* tiny controls, small buttons, menu items */
+  --r-sm:   12px;    /* inputs, small panels, images inside cards */
+  --r-md:   20px;    /* cards, list items */
+  --r-lg:   28px;    /* hero, modals, large panels */
+  --r-pill: 100px;   /* chips, pill buttons, search bars */
+  --radius:     var(--r-md);   /* legacy aliases */
+  --radius-sm:  var(--r-sm);
+  --shadow:     0 1px 2px rgba(38,50,74,0.04), 0 8px 24px rgba(66,116,184,0.06);
+  --login-bg:   linear-gradient(145deg, #7aaeea 0%, #a4c9f4 52%, #ffc4a2 100%);
 }
 
 html, body {
   height: 100%;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   color: var(--charcoal);
-  background: linear-gradient(145deg, #1e3f78 0%, #2458a8 40%, #326fca 75%, #3a80d8 100%);
+  background: var(--login-bg);
   overflow: hidden;
 }
 
@@ -35,19 +73,24 @@ html.scroll-page, body.scroll-page {
   height: auto;
   min-height: 100%;
   overflow: auto;
-  background: var(--light);
+  background: var(--canvas);
 }
 /* Only <html> should scroll. If <body> is also overflow:auto it becomes its
    own (non-scrolling) scroll container and `position: sticky` headers inside
    it stop sticking to the top of the screen. */
 body.scroll-page { overflow: visible; }
 
+/* Always reserve the scrollbar's width on scrolling pages. Without this the
+   scrollbar disappears when a panel (Messages / Cart / Sell) locks scrolling,
+   the viewport gets ~15px wider, and the centered nav shifts right. */
+html.scroll-page { scrollbar-gutter: stable; }
+
 /* ==================== INTRO OVERLAY ==================== */
 .intro-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: linear-gradient(145deg, #1e3f78 0%, #2458a8 40%, #326fca 75%, #3a80d8 100%);
+  background: var(--login-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -88,7 +131,7 @@ body.scroll-page { overflow: visible; }
 .intro-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   opacity: 0;
   transform: translateY(20px);
   position: relative;
@@ -104,21 +147,17 @@ body.scroll-page { overflow: visible; }
 }
 
 .intro-icon {
-  width: 52px;
-  height: 52px;
-  background: rgba(255,255,255,0.15);
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.25);
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(8px);
   flex-shrink: 0;
 }
 
 .intro-name {
-  font-family: 'Sora', sans-serif;
-  font-size: 2rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--white);
   letter-spacing: -0.03em;
@@ -154,7 +193,7 @@ body.scroll-page { overflow: visible; }
 /* ==================== LEFT PANEL ==================== */
 .left-panel {
   flex: 1.1;
-  background: linear-gradient(145deg, #1e3f78 0%, #2458a8 40%, #326fca 75%, #3a80d8 100%);
+  background: var(--login-bg);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -175,24 +214,20 @@ body.scroll-page { overflow: visible; }
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 2px;
 }
 
 .brand-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: rgba(255,255,255,0.15);
-  border-radius: 10px;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.2);
+  width: 36px;
+  height: 36px;
 }
 
 .brand-name {
-  font-family: 'Sora', sans-serif;
-  font-size: 1.4rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--white);
   letter-spacing: -0.02em;
@@ -208,7 +243,7 @@ body.scroll-page { overflow: visible; }
 }
 
 .tagline-heading {
-  font-family: 'Sora', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(1.8rem, 2.8vw, 2.6rem);
   font-weight: 700;
   line-height: 1.18;
@@ -239,26 +274,21 @@ body.scroll-page { overflow: visible; }
 
 .feature-icon {
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: rgba(255, 231, 190, 0.15);
-  border: 1px solid rgba(255, 231, 190, 0.25);
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
-  backdrop-filter: blur(4px);
-  transition: background 0.3s, transform 0.3s;
+  font-size: 1.7rem;
+  transition: transform 0.3s;
 }
 
 .feature-item:hover .feature-icon {
-  background: rgba(255, 231, 190, 0.25);
   transform: scale(1.08);
 }
 
 .feature-text h3 {
-  font-family: 'Sora', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.2rem;
   font-weight: 600;
   color: var(--white);
@@ -328,7 +358,7 @@ body.scroll-page { overflow: visible; }
 }
 
 .form-header h2 {
-  font-family: 'Sora', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.9rem;
   font-weight: 700;
   color: var(--charcoal);
@@ -377,7 +407,7 @@ body.scroll-page { overflow: visible; }
   padding: 12px 14px 12px 32px;
   border: 1.5px solid #dde2ec;
   border-radius: var(--radius-sm);
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.9rem;
   color: var(--charcoal);
   background: var(--light);
@@ -440,7 +470,7 @@ body.scroll-page { overflow: visible; }
   color: var(--white);
   border: none;
   border-radius: var(--radius-sm);
-  font-family: 'Sora', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -558,4 +588,17 @@ body.scroll-page { overflow: visible; }
 input::-ms-reveal,
 input::-ms-clear {
   display: none;
+}
+
+/* Sora's password bullet glyph is square-ish. Use a system font for the typed dots only
+   (placeholder keeps Sora so it still matches the rest of the form). */
+input[type="password"] {
+  font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  font-size: 1.2rem;        /* bigger dots */
+  letter-spacing: -0.04em;  /* tighter spacing between dots */
+}
+input[type="password"]::placeholder {
+  font-family: var(--font-body);
+  font-size: 0.9rem;        /* placeholder keeps its normal size */
+  letter-spacing: normal;
 }
